@@ -7,22 +7,27 @@ using DataFrames
 
 #########################################################################################
 #1: Separar os beneficiarios problematicos no carnaval, para ajusta-los manualmente no modelo
-beneficiarios_ativos = CSV.read("/home/guilherme/AlocacaoCarrosPipas/Dados/Beneficiarios_RN_Ativos_test.csv", DataFrame)
-C = beneficiarios_ativos.Capacidade
-U = beneficiarios_ativos.Pessoas_Atendidas * 0.02
+beneficiarios_ativos = CSV.read("C:/Users/lfeli/Documents/dados/Beneficiarios_RN_Ativos.csv", DataFrame, decimal=',', validate=false)
+
+to_float(x) = try parse(Float64, replace(replace(string(x), "."=>""), ","=>".")) catch; 0.0 end
+
+C = to_float.(beneficiarios_ativos.Capacidade)
+P = to_float.(beneficiarios_ativos.Pessoas_Atendidas)
+
+U = P * 0.02
 #quantos dias o reservatorio do beneficiario aguenta sem abastecimento
-Y = C ./ U
+Y = [u == 0.0 ? 0.0 : c / u for (c, u) in zip(C, U)]
 df_beneficiariosVsReservatorio = DataFrame(
     Beneficiario=1:length(C),
     Dias_sem_abastecimento=Y
 )
 quebrasCarnaval = [beneficiario for (beneficiario, x) in zip(df_beneficiariosVsReservatorio.Beneficiario, Y) if x < 5]
 df_ProblematicosCarnaval = DataFrame(BeneficiariosProblematicos=quebrasCarnaval)
-CSV.write("/home/guilherme/AlocacaoCarrosPipas/Dados/ProblematicosCarnaval.csv", df_ProblematicosCarnaval)
+#CSV.write("C:\Users\lfeli\Documents\dados\ProblematicosCarnaval.csv", df_ProblematicosCarnaval)
 
 #########################################################################################
 #2: Fazer um calendario de entregas obrigatorias para o beneficiario 2997 e um para facilitar a correcao das quebras de carnaval
-dias_uteis = CSV.read("/home/guilherme/AlocacaoCarrosPipas/Dados/datas.csv", DataFrame)
+dias_uteis = CSV.read("C:/Users/lfeli/Documents/dados/datas.csv", DataFrame)
 dias = convert(Vector{Int64}, dias_uteis.dia_util)
 
 entregas_obrigatorias2997 = zeros(Int, length(dias))
@@ -74,7 +79,7 @@ df_calendarios = DataFrame(
 )
 #CSV.write("/home/guilherme//AlocacaoCarrosPipas/Dados/calendario2997_2.csv", DataFrame(obrigatorias=entregas_obrigatorias2997))
 #CSV.write("/home//guilherme/AlocacaoCarrosPipas/Dados/calendarioCarnaval.csv", DataFrame(obrigatorias=entregas_obrigatorias_carnaval))
-CSV.write("/home/guilherme/AlocacaoCarrosPipas/Dados/CalendariosObrigatorios.csv", df_calendarios)
+CSV.write("C:/Users/lfeli/Documents/dados/CalendariosObrigatorios.csv", df_calendarios)
 #####################################################################
 
 print(entregas_obrigatorias2997)

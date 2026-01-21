@@ -8,9 +8,9 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 # --- Leitura dos Dados ---
-beneficiarios_ativos = CSV.read("/home/guilherme/AlocacaoCarrosPipas/Dados/Beneficiarios_RN_Ativos_test.csv", DataFrame)
-dias_uteis = CSV.read("/home/guilherme/AlocacaoCarrosPipas/Dados/datas.csv", DataFrame)
-calendarios = CSV.read("/home/guilherme/AlocacaoCarrosPipas/Dados/CalendariosObrigatorios.csv", DataFrame)
+beneficiarios_ativos = CSV.read("C:/Users/lfeli/Documents/dados/Beneficiarios_RN_Ativos.csv", DataFrame, decimal=',', validate=false)
+dias_uteis = CSV.read("C:/Users/lfeli/Documents/dados/datas.csv", DataFrame)
+calendarios = CSV.read("C:/Users/lfeli/Documents/dados/CalendariosObrigatorios.csv", DataFrame)
 
 
 # --- Preparação dos Parâmetros ---
@@ -21,8 +21,11 @@ duas_colunas_b = [beneficiarios_ativos.Capacidade, beneficiarios_ativos.Pessoas_
 nb = 1:300
 nd = 1:90
 
-preU = [round(i * 0.02, digits=2) for i in duas_colunas_b[2]]
-preC = convert(Vector{Float64}, duas_colunas_b[1])
+to_float(x) = try parse(Float64, replace(replace(string(x), "."=>""), ","=>".")) catch; 0.0 end
+
+preC = to_float.(beneficiarios_ativos.Capacidade)
+P = to_float.(beneficiarios_ativos.Pessoas_Atendidas)
+preU = P * 0.02
 U = [preU[j] for j in nb]
 C = [preC[j] for j in nb]
 
