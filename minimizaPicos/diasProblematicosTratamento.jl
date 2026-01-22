@@ -7,14 +7,11 @@ using DataFrames
 
 #########################################################################################
 #1: Separar os beneficiarios problematicos no carnaval, para ajusta-los manualmente no modelo
-beneficiarios_ativos = CSV.read("C:/Users/lfeli/Documents/dados/Beneficiarios_RN_Ativos.csv", DataFrame, decimal=',', validate=false)
+beneficiarios_ativos = CSV.read("C:/Users/lfeli/Documents/dados/Beneficiarios_RN_Ativos1.csv", DataFrame, decimal=',', validate=false)
 
-to_float(x) = try parse(Float64, replace(replace(string(x), "."=>""), ","=>".")) catch; 0.0 end
 
-C = to_float.(beneficiarios_ativos.Capacidade)
-P = to_float.(beneficiarios_ativos.Pessoas_Atendidas)
-
-U = P * 0.02
+U = [round(i * 0.02, digits=2) for i in duas_colunas_b[2]]
+C = convert(Vector{Float64}, duas_colunas_b[1])
 #quantos dias o reservatorio do beneficiario aguenta sem abastecimento
 Y = [u == 0.0 ? 0.0 : c / u for (c, u) in zip(C, U)]
 df_beneficiariosVsReservatorio = DataFrame(

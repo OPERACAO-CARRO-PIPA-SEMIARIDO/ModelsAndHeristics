@@ -7,10 +7,12 @@ using Gurobi
 using MathOptInterface
 const MOI = MathOptInterface
 
+BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
+
 # --- Leitura dos Dados ---
-beneficiarios_ativos = CSV.read("C:/Users/lfeli/Documents/dados/Beneficiarios_RN_Ativos.csv", DataFrame, decimal=',', validate=false)
-dias_uteis = CSV.read("C:/Users/lfeli/Documents/dados/datas.csv", DataFrame)
-calendarios = CSV.read("C:/Users/lfeli/Documents/dados/CalendariosObrigatorios.csv", DataFrame)
+beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
+dias_uteis = CSV.read(BASE_PATH * "datas.csv", DataFrame)
+calendarios = CSV.read(BASE_PATH * "/CalendariosObrigatorios.csv", DataFrame)
 
 
 # --- Preparação dos Parâmetros ---
@@ -18,20 +20,15 @@ calendarioCarnaval = calendarios.carnaval #calendario de entregas obrigatorias p
 entregasObrigatorias = calendarios.lil #calendario de entregas obrigatorias para beneficiarios com reservatorio pequueno
 duas_colunas_b = [beneficiarios_ativos.Capacidade, beneficiarios_ativos.Pessoas_Atendidas]
 
-nb = 1:300
-nd = 1:90
+nb = 1:3315
+nd = 1:365
 
-to_float(x) = try parse(Float64, replace(replace(string(x), "."=>""), ","=>".")) catch; 0.0 end
-
-preC = to_float.(beneficiarios_ativos.Capacidade)
-P = to_float.(beneficiarios_ativos.Pessoas_Atendidas)
-preU = P * 0.02
+preU = [round(i * 0.02, digits=2) for i in duas_colunas_b[2]]
+preC = convert(Vector{Float64}, duas_colunas_b[1])
 U = [preU[j] for j in nb]
 C = [preC[j] for j in nb]
 
-#Quantidade de dias que o beneficiario pode passar sem abastecimento
 Y = C ./ U
-
 #qubraX, x é o limite de dias   que o beneficiario pode passar sem receber uma entrega
 quebra4 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 5]
 quebra3 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 4]
@@ -39,7 +36,11 @@ quebra2 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 3]
 
 # --- Construção do Modelo ---
 model = Model(Gurobi.Optimizer)
-set_time_limit_sec(model, 180.0)
+set_time_limit_sec(model, 45000.0)
+
+set_optimizer_attribute(model, "Threads", 16)
+set_optimizer_attribute(model, "MIPFocus", 3)
+set_optimizer_attribute(model, "Cuts", 2)
 
 #---Variáveis---
 #Variavel de entrega
@@ -51,7 +52,7 @@ set_time_limit_sec(model, 180.0)
 
 
 # Função Objetivo, minimizar o pico de entregas sendo o total de entregas o desempate
-@objective(model, Min, y + 0.001 * sum(x[j, k] for j in nb, k in nd))
+@objective(model, Min, 100 * y + sum(x[j, k] for j in nb, k in nd))
 
 #-----Restrições-----
 #Restrições de volume
