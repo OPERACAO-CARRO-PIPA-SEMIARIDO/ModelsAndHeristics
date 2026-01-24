@@ -20,7 +20,7 @@ duas_colunas_b = [beneficiarios_ativos.Capacidade, beneficiarios_ativos.Pessoas_
 
 qtd_dias_uteis = sum(dias_uteis[:, 1]) 
 
-p = 0.5 #Constante de balanceamento da função objetivo.
+p = 0.5 
 nb = 1:3315
 nd = 1:365
 
@@ -94,25 +94,34 @@ checkpoints_minutos = [1, 3, 5, 10, 30, 90, 180, 360, 540, 720]
 checkpoints_segundos = Float64.(checkpoints_minutos .* 60)
 nomes_arquivos = ["1min", "3min", "5min", "10min", "30min", "90min", "3h", "6h", "9h", "12h"]
 
-# DataFrame para guardar o resumo (Y e Objetivo)
+# Arquivo de resumo para controle
 df_historico = DataFrame(Checkpoint = String[], FuncaoObjetivo = Float64[], Pico_Y = Int[])
 
-println("Iniciando bateria de testes incremental...")
+println("Iniciando bateria de CONTROLE incremental (Lógica Delta)...")
 
-for (limite, sufixo) in zip(checkpoints_segundos, nomes_arquivos)
-    println("\n--- Rodando até atingir $sufixo ($limite segundos) ---")
+tempo_acumulado_anterior = 0.0
+
+for (meta_tempo_total, sufixo) in zip(checkpoints_segundos, nomes_arquivos)
+    # Calcula quanto falta rodar para chegar na próxima meta
+    tempo_para_rodar = meta_tempo_total - tempo_acumulado_anterior
     
-    set_optimizer_attribute(model, "TimeLimit", limite)
+    if tempo_para_rodar <= 0.5 # Margem de erro pequena
+        println("Pulo: Meta $sufixo já foi atingida.")
+        continue
+    end
+
+    println("\n--- Checkpoint: $sufixo (Meta Total: $(meta_tempo_total)s | Rodando por +$(round(tempo_para_rodar))s) ---")
+    
+    # Define o limite APENAS para este round
+    set_optimizer_attribute(model, "TimeLimit", tempo_para_rodar)
     
     try
         optimize!(model)
     catch e
         if isa(e, InterruptException)
-            println("Interrompido manualmente. Salvando estado final...")
+            println("Interrompido manualmente.")
             if has_values(model)
                 salvar_csvs_detalhados(model, "INTERROMPIDO_$(sufixo)")
-                push!(df_historico, ("INTERROMPIDO", objective_value(model), round(Int, value(y))))
-                CSV.write("historico_convergencia.csv", df_historico)
             end
             break
         else
@@ -120,24 +129,24 @@ for (limite, sufixo) in zip(checkpoints_segundos, nomes_arquivos)
         end
     end
 
+    # Atualiza o contador GLOBAL para a próxima iteração
+    global tempo_acumulado_anterior = meta_tempo_total
+
     if has_values(model)
-        # 1. Pega os valores principais
         obj_atual = objective_value(model)
         y_atual = round(Int, value(y))
         
-        # 2. Adiciona ao DataFrame de resumo e salva no disco imediatamente
         push!(df_historico, (sufixo, obj_atual, y_atual))
-        CSV.write("historico_convergencia.csv", df_historico)
-        println("Resumo atualizado: Pico = $y_atual, Obj = $obj_atual")
-
-        # 3. Salva os CSVs grandes (Matrizes completas)
-        salvar_csvs_detalhados(model, sufixo)
+        CSV.write("CONTROLE_historico.csv", df_historico)
+        println("Resumo: Pico = $y_atual, Obj = $obj_atual")
+        
+        salvar_csvs_detalhados(model, "CONTROLE_$(sufixo)")
     else
-        println("Ainda sem solução viável neste ponto.")
+        println("Sem solução viável ainda.")
     end
 
     if termination_status(model) == MOI.OPTIMAL
-        println("Solução ÓTIMA encontrada! Finalizando.")
+        println("Solução ÓTIMA encontrada! Finalizando bateria.")
         break
     end
 end
