@@ -29,18 +29,15 @@ U = [preU[j] for j in nb]
 C = [preC[j] for j in nb]
 
 Y = C ./ U
-#qubraX, x é o limite de dias   que o beneficiario pode passar sem receber uma entrega
+#qubraX, x é o limite de dias   que o beneficiario pode passar sem receber uma entrega
 quebra4 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 5]
 quebra3 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 4]
 quebra2 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 3]
 
 # --- Construção do Modelo ---
 model = Model(Gurobi.Optimizer)
-set_time_limit_sec(model, 45000.0)
+set_time_limit_sec(model, 43600)
 
-set_optimizer_attribute(model, "Threads", 16)
-set_optimizer_attribute(model, "MIPFocus", 3)
-set_optimizer_attribute(model, "Cuts", 2)
 
 #---Variáveis---
 #Variavel de entrega
@@ -52,13 +49,13 @@ set_optimizer_attribute(model, "Cuts", 2)
 
 
 # Função Objetivo, minimizar o pico de entregas sendo o total de entregas o desempate
-@objective(model, Min, 100 * y + sum(x[j, k] for j in nb, k in nd))
+@objective(model, Min, y + 1000 * sum(x[j, k] for j in nb, k in nd))
 
 #-----Restrições-----
 #Restrições de volume
 @constraint(model, balancoVolumeInicial[j in nb], V[j, 1] == C[j])
 @constraint(model, balancoVolume[j in nb, k in 2:last(nd);
-        !(calendarioCarnaval[k] == -1 && j in quebra4) &&
+         !(calendarioCarnaval[k] == -1 && j in quebra4) &&
         !(entregasObrigatorias[k] == -1 && j in quebra2)],
     V[j, k] <= V[j, k-1] - U[j] + 13.0 * x[j, k])
 @constraint(model, correcaoVolume[j in nb, k in nd;
@@ -80,11 +77,22 @@ set_optimizer_attribute(model, "Cuts", 2)
 
 
 """
-Função para resolver o modelo e, se for inviável, depurar e imprimir o conjunto de restrições e variáveis conflitantes (IIS).
+Função para resolver o modelo e permitir interrupção via Ctrl+C salvando o resultado.
 """
 function resolve_e_depurar(model_instance)
     tempo_inicio = time()
-    optimize!(model_instance)
+    println("Otimizando... (Use Ctrl+C para parar e salvar)")
+    
+    # Bloco try-catch para capturar Ctrl+C (InterruptException)
+    try
+        optimize!(model_instance)
+    catch e
+        if isa(e, InterruptException)
+            println("\nInterrompido pelo usuário. Salvando melhor solução encontrada...")
+        else
+            rethrow(e)
+        end
+    end
 
     # --- SEÇÃO DE DEBUGGER ---
     if termination_status(model_instance) == MOI.INFEASIBLE
@@ -98,7 +106,7 @@ function resolve_e_depurar(model_instance)
         for (F, S) in list_of_constraint_types(model_instance)
             for con in all_constraints(model_instance, F, S)
                 if get_attribute(con, MOI.ConstraintConflictStatus()) == MOI.IN_CONFLICT
-                    println("  → ", con)
+                    println("  → ", con)
                 end
             end
         end
@@ -106,7 +114,7 @@ function resolve_e_depurar(model_instance)
         println("\nVariáveis com Limites em Conflito:")
         for var in all_variables(model_instance)
             if get_attribute(var, MOI.VariableConflictStatus()) == MOI.IN_CONFLICT
-                println("  → ", var)
+                println("  → ", var)
             end
         end
         println("------------------------------------------------------")
@@ -114,13 +122,18 @@ function resolve_e_depurar(model_instance)
         return nothing
     end
 
-    tempo_fim = time()
-    tempo_total = tempo_fim - tempo_inicio
+    # Se tiver solução (seja por fim normal ou interrupção com solução viável)
+    if has_values(model_instance)
+        tempo_fim = time()
+        tempo_total = tempo_fim - tempo_inicio
 
-    println("Tempo de resolução: ", round(tempo_total, digits=2), " segundos")
-    println("Valor da função objetivo: ", objective_value(model_instance))
-
-    return true # Retorna um valor para indicar sucesso
+        println("Tempo de resolução: ", round(tempo_total, digits=2), " segundos")
+        println("Valor da função objetivo: ", objective_value(model_instance))
+        return true
+    else
+        println("Nenhuma solução viável disponível.")
+        return nothing
+    end
 end
 
 # --- Execução e Pós-processamento ---
@@ -134,7 +147,7 @@ if resolve_e_depurar(model) !== nothing
         push!(colunas_v, [value(V[j, i]) for j in beneficiarios])
     end
     df_output_v = DataFrame(colunas_v, column_names_v)
-    CSV.write("volumes_diarios.csv", df_output_v)
+    CSV.write("volumes_diarios2.csv", df_output_v)
 
     column_names_x = Symbol.(["Beneficiarios"; nd...])
     colunas_x = Any[[j for j in beneficiarios]]
@@ -142,9 +155,9 @@ if resolve_e_depurar(model) !== nothing
         push!(colunas_x, [round(Int, value(x[j, i])) for j in beneficiarios])
     end
     df_output_x = DataFrame(colunas_x, column_names_x)
-    CSV.write("abastecimento_diario.csv", df_output_x)
+    CSV.write("abastecimento_diario2.csv", df_output_x)
 
     println("\nCSVs de abastecimento e volume diarios gerados")
 else
-    println("\nModelo não foi resolvido devido a conflitos. Nenhum CSV foi gerado.")
+    println("\nModelo não resolvido ou sem solução viável. Nenhum CSV gerado.")
 end
