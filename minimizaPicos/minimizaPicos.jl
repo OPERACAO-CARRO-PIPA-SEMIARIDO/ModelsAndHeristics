@@ -20,6 +20,9 @@ calendarioCarnaval = calendarios.carnaval #calendario de entregas obrigatorias p
 entregasObrigatorias = calendarios.lil #calendario de entregas obrigatorias para beneficiarios com reservatorio pequueno
 duas_colunas_b = [beneficiarios_ativos.Capacidade, beneficiarios_ativos.Pessoas_Atendidas]
 
+qtd_dias_uteis = sum(dias_uteis[:, 1]) 
+
+p = 0.5 
 nb = 1:3315
 nd = 1:365
 
@@ -49,7 +52,7 @@ set_time_limit_sec(model, 43600)
 
 
 # Função Objetivo, minimizar o pico de entregas sendo o total de entregas o desempate
-@objective(model, Min, y + 1000 * sum(x[j, k] for j in nb, k in nd))
+@objective(model, Min, p*qtd_dias_uteis*y + (1 - p)*sum(x[j, k] for j in nb, k in nd))
 
 #-----Restrições-----
 #Restrições de volume
