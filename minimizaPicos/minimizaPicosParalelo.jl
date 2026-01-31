@@ -4,13 +4,12 @@ using CSV
 using DataFrames
 using Gurobi
 using MathOptInterface
-using Base.Threads # Necessário para o @spawn
+using Base.Threads
 const MOI = MathOptInterface
 
 # --- CONFIGURAÇÕES GERAIS ---
 BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
 
-# Carregamento de dados (Compartilhado na memória para economizar RAM)
 beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
 dias_uteis = CSV.read(BASE_PATH * "datas.csv", DataFrame)
 calendarios = CSV.read(BASE_PATH * "/CalendariosObrigatorios.csv", DataFrame)
@@ -36,25 +35,19 @@ quebra2 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 3]
 
 # --- FUNÇÃO DO MODELO ---
 function rodar_cenario(p_valor, nome_pasta)
-    # Identifica em qual thread do processador está rodando
     id_thread = Threads.threadid()
-    println("\n[Thread $id_thread] Iniciando cenário p=$p_valor na pasta $nome_pasta")
 
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
         mkpath(caminho_pasta)
     end
 
-    # Criação do ambiente Gurobi isolado é automática pelo JuMP
     model = Model(Gurobi.Optimizer)
     
-    # LIMITAÇÃO DE RECURSOS: Usar 8 threads para cada modelo (Total 16)
-    set_optimizer_attribute(model, "Threads", 8)
-    set_optimizer_attribute(model, "MIPFocus", 3) 
-    
-    # Trava de segurança de RAM: Se passar de 10GB, ele escreve no disco
-    # Isso evita que o PC trave se os dois modelos explodirem a memória juntos
-    set_optimizer_attribute(model, "NodefileStart", 10.0)
+    # --- CONFIGURAÇÃO DE HARDWARE (Segurança) ---
+    # NodefileStart para não estourar a RAM em corridas longas
+    set_optimizer_attribute(model, "NodefileStart", 20.0)
+     
 
     @variable(model, 0 <= x[j in nb, k in nd], Int)
     @variable(model, 0 <= V[j in nb, k in nd])
@@ -78,29 +71,56 @@ function rodar_cenario(p_valor, nome_pasta)
     @constraint(model, carnavalAbastecimento[j in quebra4, k in nd; calendarioCarnaval[k] == 1], x[j, k] >= 1)
     @constraint(model, lilAbastecimento[j in quebra2, k in nd; entregasObrigatorias[k] == 1], x[j, k] >= 1)
 
-    # Checkpoints solicitados: 90min, 3h, 6h, 9h, 12h
-    checkpoints_minutos = [90, 180, 360, 540, 720]
-    checkpoints_segundos = Float64.(checkpoints_minutos .* 60)
-    nomes_arquivos = ["90min", "3h", "6h", "9h", "12h"]
+    # --- DEFINIÇÃO DOS CHECKPOINTS (Até 72h) ---
+    # Minutos iniciais
+    mins_iniciais = [1, 3, 5, 10, 30]
+    # Horas completas (de 1h até 72h) -> Convertendo para minutos
+    horas_range = 1:72
+    mins_horas = horas_range .* 60
     
-    df_historico = DataFrame(Checkpoint = String[], FuncaoObjetivo = Float64[], Pico_Y = Int[])
+    # Junta tudo e remove duplicatas
+    checkpoints_minutos = unique(vcat(mins_iniciais, mins_horas))
+    checkpoints_segundos = Float64.(checkpoints_minutos .* 60)
+    
+    # Cria nomes amigáveis para os arquivos
+    nomes_arquivos = String[]
+    for m in checkpoints_minutos
+        if m < 60
+            push!(nomes_arquivos, "$(m)min")
+        else
+            h = Int(m / 60)
+            push!(nomes_arquivos, "$(h)h")
+        end
+    end
+
+    # DataFrame estendido com BestBound e Gap
+    df_historico = DataFrame(
+        Tempo_Label = String[], 
+        Tempo_Segundos = Float64[],
+        FuncaoObjetivo = Float64[], 
+        BestBound = Float64[],
+        Gap_Percent = Float64[],
+        Sum_X = Int[],
+        Pico_Y = Int[]
+    )
+    
     tempo_acumulado_anterior = 0.0
 
     for (meta_tempo_total, sufixo) in zip(checkpoints_segundos, nomes_arquivos)
         tempo_para_rodar = meta_tempo_total - tempo_acumulado_anterior
 
+        # Pequena margem para evitar rodar por 0.001 segundos
         if tempo_para_rodar <= 1.0
             continue
         end
 
-        println("\n[p=$p_valor] Checkpoint: $sufixo (Meta: $(meta_tempo_total)s)")
         set_optimizer_attribute(model, "TimeLimit", tempo_para_rodar)
 
         try
             optimize!(model)
         catch e
             if isa(e, InterruptException)
-                println("[p=$p_valor] Interrompido. Salvando e saindo.")
+                println("[p=$p_valor] Interrompido manualmente.")
                 if has_values(model)
                     salvar_arquivos(model, nome_pasta, "INTERROMPIDO_$sufixo", nb, nd)
                 end
@@ -113,23 +133,36 @@ function rodar_cenario(p_valor, nome_pasta)
         tempo_acumulado_anterior = meta_tempo_total
 
         if has_values(model)
+            # Extração de Métricas Avançadas
             obj = objective_value(model)
-            pico = round(Int, value(y))
-            push!(df_historico, (sufixo, obj, pico))
-            CSV.write(joinpath(nome_pasta, "historico_convergencia.csv"), df_historico)
+            # Best Bound (Limite Inferior)
+            bound = try objective_bound(model) catch; -1.0 end 
+            # Gap Relativo
+            gap = try MOI.get(model, MOI.RelativeGap()) * 100 catch; 0.0 end
             
+            pico = round(Int, value(y))
+            # Cálculo eficiente da soma de x
+            soma_x = round(Int, sum(value.(x))) 
+
+            # Salva no Histórico
+            push!(df_historico, (sufixo, meta_tempo_total, obj, bound, gap, soma_x, pico))
+            CSV.write(joinpath(nome_pasta, "historico_controle.csv"), df_historico)
+            
+            
+            # Salva os arquivos pesados (CSVs de volume e abastecimento)
             salvar_arquivos(model, nome_pasta, sufixo, nb, nd)
+        else
+            println(" > Ainda sem solução viável.")
         end
 
         if termination_status(model) == MOI.OPTIMAL
-            println("[p=$p_valor] Solução ÓTIMA encontrada! Finalizando este cenário.")
+            println("[p=$p_valor] Solução ÓTIMA comprovada! Finalizando.")
             break
         end
     end
 end
 
 function salvar_arquivos(model_inst, pasta, sufixo, nb_range, nd_range)
-    # Salvamento otimizado (sem imprimir no console para não misturar log das threads)
     val_V = value.(model_inst[:V])
     val_x = value.(model_inst[:x])
 
@@ -148,19 +181,19 @@ function salvar_arquivos(model_inst, pasta, sufixo, nb_range, nd_range)
     CSV.write(joinpath(pasta, "abastecimento_$sufixo.csv"), df_x)
 end
 
-# --- EXECUÇÃO PARALELA ---
+# --- EXECUÇÃO ---
 
-println("Iniciando execução paralela com $(Threads.nthreads()) threads do Julia...")
+# --- OPÇÃO A: Rodar apenas UM Controle (p=0.5) ---
+# Use esta opção se quer apenas validar o modelo base.
+rodar_cenario(0.5, "resultadosControle")
 
-# Dispara a tarefa 1 em background
-task1 = Threads.@spawn rodar_cenario(0.25, "resultados025")
+# --- OPÇÃO B: Rodar em Paralelo (p=0.25 e p=0.75) ---
+# Se quiser refazer os cenários anteriores com essa nova lógica de 72h, 
+# COMENTE a linha acima (Opção A) e DESCOMENTE as linhas abaixo:
 
-# Dispara a tarefa 2 em background
-task2 = Threads.@spawn rodar_cenario(0.75, "resultados075")
+# t1 = Threads.@spawn rodar_cenario(0.25, "Controle_72h_P025")
+# t2 = Threads.@spawn rodar_cenario(0.75, "Controle_72h_P075")
+# wait(t1)
+# wait(t2)
 
-# O script principal espera as duas terminarem
-println("Tarefas disparadas. Aguardando conclusão...")
-wait(task1)
-wait(task2)
-
-println("\nAMBOS OS MODELOS FINALIZADOS.")
+println("\nEXECUÇÃO FINALIZADA.")
