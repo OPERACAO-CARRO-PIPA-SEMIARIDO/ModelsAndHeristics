@@ -7,8 +7,8 @@ import os
 # Defina a capacidade do caminhão (baseado no seu código Julia: 13.0)
 CAPACIDADE_CAMINHAO = 13.0 
 # Caminhos dos arquivos (Baseado no seu snippet Julia)
-BASE_PATH = "/home/guilherme/repos/backup/AlocacaoCarrosPipas/Dados/"
-ARQUIVO_BENEFICIARIOS = os.path.join(BASE_PATH, "Beneficiarios_RN_Ativos_test.csv")
+BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
+ARQUIVO_BENEFICIARIOS = os.path.join(BASE_PATH, "Beneficiarios_RN_Ativos1.csv")
 ARQUIVO_DATAS = os.path.join(BASE_PATH, "datas.csv")
 # O arquivo de calendários não parecia ser usado explicitamente na lógica do loop Python fornecido, 
 # mas se precisar das exceções de carnaval, deve ser carregado aqui.

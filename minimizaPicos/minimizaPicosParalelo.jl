@@ -34,7 +34,8 @@ quebra3 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 4]
 quebra2 = [beneficiario for (beneficiario, x) in zip(nb, Y) if x < 3]
 
 # --- FUNÇÃO DO MODELO ---
-function rodar_cenario(p_valor, nome_pasta)
+# Adicionado argumento opcional: arquivo_warm_start
+function rodar_cenario(p_valor, nome_pasta; arquivo_warm_start=nothing)
     id_thread = Threads.threadid()
 
     caminho_pasta = joinpath(pwd(), nome_pasta)
@@ -45,10 +46,8 @@ function rodar_cenario(p_valor, nome_pasta)
     model = Model(Gurobi.Optimizer)
     
     # --- CONFIGURAÇÃO DE HARDWARE (Segurança) ---
-    # NodefileStart para não estourar a RAM em corridas longas
     set_optimizer_attribute(model, "NodefileStart", 20.0)
-     
-
+      
     @variable(model, 0 <= x[j in nb, k in nd], Int)
     @variable(model, 0 <= V[j in nb, k in nd])
     @variable(model, 0 <= y, Int)
@@ -71,18 +70,69 @@ function rodar_cenario(p_valor, nome_pasta)
     @constraint(model, carnavalAbastecimento[j in quebra4, k in nd; calendarioCarnaval[k] == 1], x[j, k] >= 1)
     @constraint(model, lilAbastecimento[j in quebra2, k in nd; entregasObrigatorias[k] == 1], x[j, k] >= 1)
 
+    # --- LÓGICA DE WARM START (NOVO) ---
+    if !isnothing(arquivo_warm_start) && isfile(arquivo_warm_start)
+        println(">>> Carregando Warm Start de: $arquivo_warm_start")
+        try
+            df_start = CSV.read(arquivo_warm_start, DataFrame)
+            count_loaded = 0
+            
+            # Assume que a coluna 1 é o ID do beneficiário e as outras são dias ("1", "2"...)
+            for row in eachrow(df_start)
+                # Tenta pegar o ID da coluna 'Beneficiarios' ou assume a primeira coluna
+                j_id = hasproperty(df_start, :Beneficiarios) ? row.Beneficiarios : row[1]
+                
+                # Se o ID não estiver no range atual do modelo, pula
+                if !(j_id in nb) continue end
+
+                for k in nd
+                    col_sym = Symbol(string(k)) # Converte dia int para Symbol ("1")
+                    if hasproperty(row, col_sym)
+                        valor = row[col_sym]
+                        if !ismissing(valor)
+                            # Injeta o valor inicial na variável x
+                            set_start_value(x[j_id, k], valor)
+                            count_loaded += 1
+                        end
+                    end
+                end
+            end
+            println(">>> Warm Start carregado! Valores injetados em $count_loaded variáveis x.")
+            
+            # Opcional: Tentar inferir um valor inicial para y baseado no x carregado
+            # Isso ajuda o Gurobi a ter um bound superior imediato
+            max_pico = 0
+            for k in nd
+                col_sym = Symbol(string(k))
+                if hasproperty(df_start, col_sym)
+                     soma_dia = sum(skipmissing(df_start[!, col_sym]))
+                     if soma_dia > max_pico
+                         max_pico = soma_dia
+                     end
+                end
+            end
+            if max_pico > 0
+                set_start_value(y, max_pico)
+                println(">>> Valor inicial de Y definido como: $max_pico")
+            end
+
+        catch e
+            println("!!! Erro ao carregar Warm Start: $e")
+            println("!!! O modelo continuará rodando sem o Warm Start.")
+        end
+    elseif !isnothing(arquivo_warm_start)
+        println("!!! Aviso: Arquivo de Warm Start não encontrado: $arquivo_warm_start")
+    end
+    # -----------------------------------
+
     # --- DEFINIÇÃO DOS CHECKPOINTS (Até 72h) ---
-    # Minutos iniciais
     mins_iniciais = [1, 3, 5, 10, 30]
-    # Horas completas (de 1h até 72h) -> Convertendo para minutos
-    horas_range = 1:72
+    horas_range = 1:24
     mins_horas = horas_range .* 60
     
-    # Junta tudo e remove duplicatas
     checkpoints_minutos = unique(vcat(mins_iniciais, mins_horas))
     checkpoints_segundos = Float64.(checkpoints_minutos .* 60)
     
-    # Cria nomes amigáveis para os arquivos
     nomes_arquivos = String[]
     for m in checkpoints_minutos
         if m < 60
@@ -93,7 +143,6 @@ function rodar_cenario(p_valor, nome_pasta)
         end
     end
 
-    # DataFrame estendido com BestBound e Gap
     df_historico = DataFrame(
         Tempo_Label = String[], 
         Tempo_Segundos = Float64[],
@@ -109,7 +158,6 @@ function rodar_cenario(p_valor, nome_pasta)
     for (meta_tempo_total, sufixo) in zip(checkpoints_segundos, nomes_arquivos)
         tempo_para_rodar = meta_tempo_total - tempo_acumulado_anterior
 
-        # Pequena margem para evitar rodar por 0.001 segundos
         if tempo_para_rodar <= 1.0
             continue
         end
@@ -133,23 +181,16 @@ function rodar_cenario(p_valor, nome_pasta)
         tempo_acumulado_anterior = meta_tempo_total
 
         if has_values(model)
-            # Extração de Métricas Avançadas
             obj = objective_value(model)
-            # Best Bound (Limite Inferior)
             bound = try objective_bound(model) catch; -1.0 end 
-            # Gap Relativo
             gap = try MOI.get(model, MOI.RelativeGap()) * 100 catch; 0.0 end
             
             pico = round(Int, value(y))
-            # Cálculo eficiente da soma de x
             soma_x = round(Int, sum(value.(x))) 
 
-            # Salva no Histórico
             push!(df_historico, (sufixo, meta_tempo_total, obj, bound, gap, soma_x, pico))
             CSV.write(joinpath(nome_pasta, "historico_controle.csv"), df_historico)
             
-            
-            # Salva os arquivos pesados (CSVs de volume e abastecimento)
             salvar_arquivos(model, nome_pasta, sufixo, nb, nd)
         else
             println(" > Ainda sem solução viável.")
@@ -183,17 +224,13 @@ end
 
 # --- EXECUÇÃO ---
 
-# --- OPÇÃO A: Rodar apenas UM Controle (p=0.5) ---
-# Use esta opção se quer apenas validar o modelo base.
-rodar_cenario(0.5, "resultadosControle")
+# EXEMPLO DE USO COM WARM START:
+# Supondo que você tem um arquivo chamado "abastecimento_72h.csv" na pasta "resultadosControle"
+# e quer rodar um novo cenário (ex: p=0.25) usando ele como base.
 
-# --- OPÇÃO B: Rodar em Paralelo (p=0.25 e p=0.75) ---
-# Se quiser refazer os cenários anteriores com essa nova lógica de 72h, 
-# COMENTE a linha acima (Opção A) e DESCOMENTE as linhas abaixo:
+path_start = BASE_PATH * "abastecimento_diario_py.csv"
 
-# t1 = Threads.@spawn rodar_cenario(0.25, "Controle_72h_P025")
-# t2 = Threads.@spawn rodar_cenario(0.75, "Controle_72h_P075")
-# wait(t1)
-# wait(t2)
+# Verifique se o arquivo existe antes de rodar, ou deixe a função avisar
+rodar_cenario(0.1, "resultados10wLim"; arquivo_warm_start=path_start)
 
 println("\nEXECUÇÃO FINALIZADA.")
