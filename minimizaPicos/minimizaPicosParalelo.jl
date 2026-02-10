@@ -232,6 +232,6 @@ end
 path_start = joinpath(pwd(), "resultadosControle/abastecimento_24h.csv")
 
 # Verifique se o arquivo existe antes de rodar, ou deixe a função avisar
-rodar_cenario(0.99, "resultados99w24"; arquivo_warm_start=path_start)
+rodar_cenario(0.0, "resultados00w24"; arquivo_warm_start=path_start)
 
 println("\nEXECUÇÃO FINALIZADA.")
