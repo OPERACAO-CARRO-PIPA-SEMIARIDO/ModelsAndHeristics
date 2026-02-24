@@ -1,0 +1,7 @@
+Nome da Instância,Total de Entregas,Status,Custo Modelo Exato (M1),Custo Heurística,Gap (%),Caminho da Entrada,Pasta de Saída
+00,3315,Sucesso,2223257.660377,2467920.5028,11.0,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\entradas\00.csv,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\saidas\alocacao_00
+01w24,3315,Sucesso,2447547.1598030003,2492096.5648000003,1.82,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\entradas\01w24.csv,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\saidas\alocacao_01w24
+10wLim,3315,Sucesso,2228923.9345510006,2261986.8442,1.48,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\entradas\10wLim.csv,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\saidas\alocacao_10wLim
+5072h,3315,Sucesso,2338453.4959279997,2379435.4346000003,1.75,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\entradas\5072h.csv,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\saidas\alocacao_5072h
+50wLim,3315,Sucesso,2409050.8930309997,2450491.1585,1.72,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\entradas\50wLim.csv,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\saidas\alocacao_50wLim
+75w00,3315,Sucesso,2537623.539127,2591364.9433000004,2.12,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\entradas\75w00.csv,C:\Users\lfeli\Documents\AlocacaoCarros\ModelsAndHeristics\alocacao\saidas\alocacao_75w00
