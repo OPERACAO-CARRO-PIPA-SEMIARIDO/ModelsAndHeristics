@@ -229,9 +229,9 @@ end
 # e quer rodar um novo cenário (ex: p=0.25) usando ele como base.
 
 #path_start = BASE_PATH * "abastecimento_diario_py.csv"
-path_start = joinpath(pwd(), "resultadosControle/abastecimento_24h.csv")
+path_start = joinpath(pwd(), "resultados00/abastecimento_24h.csv")
 
 # Verifique se o arquivo existe antes de rodar, ou deixe a função avisar
-rodar_cenario(0.0, "resultados00w24"; arquivo_warm_start=path_start)
+rodar_cenario(0.75, "resultados75w00";arquivo_warm_start = path_start)
 
 println("\nEXECUÇÃO FINALIZADA.")
