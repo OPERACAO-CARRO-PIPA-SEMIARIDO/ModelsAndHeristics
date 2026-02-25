@@ -10,7 +10,7 @@ PASTA_BASE = Path(__file__).parent.resolve()
 PASTA_ENTRADAS = PASTA_BASE / "entradas"
 PASTA_SAIDAS = PASTA_BASE / "saidas"
 
-# Assumindo que a pasta Dados está na raiz do projeto (ajuste se necessário)
+# Assumindo que a pasta Dados está na raiz do projeto
 ARQUIVO_ROTAS = PASTA_BASE / "Dados" / "rotas"
 
 PASTA_SAIDAS.mkdir(parents=True, exist_ok=True)
@@ -28,14 +28,21 @@ def executar_automacao():
         nome_entrada = caminho_arquivo.stem 
         print(f"\n[{time.strftime('%H:%M:%S')}] Processando: {nome_entrada}...")
         
-        # 1. Tratamento do separador e do índice
+        # 1. Tratamento dos dados de entrada
+        # Com index_col=0, a coluna de IDs vira o índice, deixando apenas os dias nas colunas do DataFrame
         df_entrada = pd.read_csv(caminho_arquivo, sep=',', index_col=0) 
-        total_entregas = len(df_entrada) 
+        
+        # O Pandas avalia quais demandas são maiores que 0 e soma a quantidade de entregas por dia
+        entregas_por_dia = (df_entrada > 0).sum()
+        
+        # Soma de todos os dias
+        total_entregas = int(entregas_por_dia.sum())
+        # O dia com o maior número de viagens/entregas
+        pico_abastecimento = int(entregas_por_dia.max())
         
         pasta_alocacao = PASTA_SAIDAS / f"alocacao_{nome_entrada}"
         pasta_alocacao.mkdir(parents=True, exist_ok=True)
         
-        # Define os caminhos de saída exatos para esta instância
         caminho_aloc_m1 = pasta_alocacao / "alocacao_m1.csv"
         caminho_custo_m1 = pasta_alocacao / "custos_m1.csv"
         
@@ -44,7 +51,6 @@ def executar_automacao():
 
         # 2. Blindagem contra falhas do Solver/Modelo
         try:
-            # Monta os comandos passando: entrada, saida_alocacao, saida_custos, arquivo_rotas
             cmd_m1 = [
                 "julia", str(PASTA_BASE / "m1args.jl"), 
                 str(caminho_arquivo.resolve()), 
@@ -61,21 +67,19 @@ def executar_automacao():
                 str(ARQUIVO_ROTAS.resolve())
             ]
             
-            # Executa o modelo em Julia
             print("  -> Rodando Modelo Exato (Julia)...")
             subprocess.run(cmd_m1, capture_output=True, text=True, check=True)
             
-            # Executa a Heurística em Python
             print("  -> Rodando Heurística (Python)...")
             subprocess.run(cmd_heu, capture_output=True, text=True, check=True)
 
             # --- CAPTURA DOS CUSTOS REAIS ---
-            # Lê os arquivos gerados e soma a coluna 'Solucao_otima' de todos os dias
             df_custo_m1 = pd.read_csv(caminho_custo_m1)
-            custo_m1 = df_custo_m1['Solucao_otima'].sum()
+            # Round usado para cortar casas decimais exageradas que possam bugar o visual no Excel
+            custo_m1 = round(df_custo_m1['Solucao_otima'].sum(), 2)
 
             df_custo_heu = pd.read_csv(caminho_custo_heu)
-            custo_heu = df_custo_heu['Solucao_otima'].sum()
+            custo_heu = round(df_custo_heu['Solucao_otima'].sum(), 2)
             
             status = "Sucesso"
             gap = round(((custo_heu - custo_m1) / custo_m1) * 100, 2) if custo_m1 > 0 else 0.0
@@ -98,6 +102,7 @@ def executar_automacao():
         dados_planilha.append({
             "Nome da Instância": nome_entrada,
             "Total de Entregas": total_entregas,
+            "Pico de Abastecimento (Max/Dia)": pico_abastecimento,
             "Status": status,
             "Custo Modelo Exato (M1)": custo_m1,
             "Custo Heurística": custo_heu,
@@ -106,7 +111,7 @@ def executar_automacao():
             "Pasta de Saída": str(pasta_alocacao.resolve())
         })
 
-        # 3. Salva um backup CSV a cada iteração
+        # Backup seguro durante o processamento longo
         pd.DataFrame(dados_planilha).to_csv(PASTA_SAIDAS / "backup_temporario.csv", index=False)
 
     # ==========================================
@@ -118,6 +123,7 @@ def executar_automacao():
     with pd.ExcelWriter(caminho_planilha, engine='openpyxl') as writer:
         df_resultados.to_excel(writer, index=False, sheet_name='Resultados_Custos')
         
+        # Auto-ajuste de colunas
         worksheet = writer.sheets['Resultados_Custos']
         for col in worksheet.columns:
             max_length = 0
