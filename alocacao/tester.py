@@ -8,7 +8,7 @@ import subprocess
 # ==========================================
 PASTA_BASE = Path(__file__).parent.resolve()
 PASTA_ENTRADAS = PASTA_BASE / "entradas"
-PASTA_SAIDAS = PASTA_BASE / "saidas"
+PASTA_SAIDAS = PASTA_BASE / "saidas_2"
 
 ARQUIVO_ROTAS = PASTA_BASE / "Dados" / "rotas"
 
@@ -27,11 +27,17 @@ def executar_automacao():
         print(f"\n[{time.strftime('%H:%M:%S')}] Processando: {nome_entrada}...")
         
         # 1. Tratamento dos dados de entrada
+         # 1. Tratamento dos dados de entrada
         df_entrada = pd.read_csv(caminho_arquivo, sep=',', index_col=0) 
         
-        entregas_por_dia = (df_entrada > 0).sum()
+        # Faz a soma real dos valores de cada coluna (dia)
+        entregas_por_dia = df_entrada.sum() 
+        
+        # Soma todos os dias para ter o total absoluto
         total_entregas = int(entregas_por_dia.sum())
-        pico_abastecimento = int(entregas_por_dia.max())
+        
+        # O pico passa a ser o dia com o MAIOR NÚMERO DE CAMINHÕES, não apenas de visitas
+        pico_abastecimento = int(entregas_por_dia.max())       
         
         pasta_alocacao = PASTA_SAIDAS / f"alocacao_{nome_entrada}"
         pasta_alocacao.mkdir(parents=True, exist_ok=True)
