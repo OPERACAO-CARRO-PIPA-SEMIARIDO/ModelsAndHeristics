@@ -1,4 +1,3 @@
-
 using JuMP
 using LinearAlgebra
 using CSV
@@ -7,15 +6,12 @@ using Gurobi
 using MathOptInterface
 const MOI = MathOptInterface
 
-# ==========================================
-# CONSTANTES E PREPARAÇÃO DE DADOS
-# ==========================================
 BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
 
 beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
 dias_uteis = CSV.read(BASE_PATH * "datas.csv", DataFrame)
 calendarios = CSV.read(BASE_PATH * "CalendariosObrigatorios.csv", DataFrame)
-rotas = CSV.read(BASE_PATH * "rotas.csv", DataFrame)
+rotas = CSV.read(BASE_PATH * "rotas", DataFrame)
 
 calendarioCarnaval = calendarios.carnaval
 entregasObrigatorias = calendarios.lil
@@ -24,7 +20,7 @@ TOTAL_MANANCIAIS = 92
 TOTAL_BENEFICIARIOS = 3315
 TOTAL_DIAS = 365
 CAPACIDADE_MAX_MANANCIAL = 12
-NUM_CANDIDATOS = 5 
+NUM_CANDIDATOS = 3 
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
@@ -49,9 +45,6 @@ for j in nb
     candidatos_por_beneficiario[j] = fontes_ordenadas[1:NUM_CANDIDATOS]
 end
 
-# ==========================================
-# MODELO MATEMÁTICO INTEGRADO
-# ==========================================
 function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
@@ -59,62 +52,50 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     end
 
     model = Model(Gurobi.Optimizer)
+    set_optimizer_attribute(model, "Threads", 8)
+    set_optimizer_attribute(model, "NodefileStart", 15.0)
+    set_optimizer_attribute(model, "MemLimit", 24.0)
+    set_optimizer_attribute(model, "Method", 1)
     
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
     @variable(model, 0 <= y_pico, Int)
     @variable(model, 0 <= V[j in nb, k in nd])
 
-    # Expressões para compor a função objetivo e extrair métricas do histórico
     @expression(model, expr_pico, qtd_dias_uteis * y_pico)
     @expression(model, expr_custo, sum(Dij[i,j] * x[j, i, k] for j in nb, i in candidatos_por_beneficiario[j], k in nd))
     @expression(model, expr_entregas, sum(x[j, i, k] for j in nb, i in candidatos_por_beneficiario[j], k in nd))
 
     @objective(model, Min, (p * expr_pico) + ((1 - p) * expr_custo))
 
-    # Define o volume inicial de cada beneficiário igual à sua capacidade máxima
     @constraint(model, balancoVolumeInicial[j in nb], V[j, 1] == C[j])
     
-    # Calcula o volume restante subtraindo o consumo e somando o que foi abastecido no dia
     @constraint(model, balancoVolume[j in nb, k in 2:last(nd); !(calendarioCarnaval[k] == -1 && j in quebra4) && !(entregasObrigatorias[k] == -1 && j in quebra2)],
         V[j, k] <= V[j, k-1] - U[j] + 13.0 * sum(x[j, i, k] for i in candidatos_por_beneficiario[j]))
     
-    # Zera o volume em dias de restrição específica
     @constraint(model, correcaoVolume[j in nb, k in nd; (calendarioCarnaval[k] == -1 && j in quebra4) || (entregasObrigatorias[k] == -1 && j in quebra2)],
         V[j, k] == 0)
         
-    # Impede o abastecimento em dias não úteis definidos no calendário geral
     @constraint(model, diasInuteis[j in nb, k in nd; Int(dias_uteis[k, 1]) == 0], sum(x[j, i, k] for i in candidatos_por_beneficiario[j]) == 0)
     
-    # Limita a soma de todas as entregas do dia à variável de pico máximo (y_pico)
     @constraint(model, restMaiorPico[k in nd], sum(x[j, i, k] for j in nb, i in candidatos_por_beneficiario[j]) <= y_pico)
     
-    # Garante que o volume armazenado nunca fique negativo
     @constraint(model, volumeMinimo[j in nb, k in nd], V[j, k] >= 0)
     
-    # Garante que o volume armazenado não ultrapasse a capacidade total do beneficiário
     @constraint(model, capacidadeMax[j in nb, k in nd], V[j, k] <= C[j])
     
-    # Força pelo menos um abastecimento no Carnaval para beneficiários com alta taxa de consumo
     @constraint(model, carnavalAbastecimento[j in quebra4, k in nd; calendarioCarnaval[k] == 1], sum(x[j, i, k] for i in candidatos_por_beneficiario[j]) >= 1)
     
-    # Força pelo menos um abastecimento na LIL para beneficiários com taxa crítica
     @constraint(model, lilAbastecimento[j in quebra2, k in nd; entregasObrigatorias[k] == 1], sum(x[j, i, k] for i in candidatos_por_beneficiario[j]) >= 1)
 
-    # Obriga o modelo a escolher exatamente um manancial (fonte única anual) para cada beneficiário
     @constraint(model, fonteUnica[j in nb], sum(z[j, i] for i in candidatos_por_beneficiario[j]) == 1)
     
-    # Permite o envio de água apenas do manancial selecionado na restrição de fonte única
     @constraint(model, amarra_z_x[j in nb, k in nd, i in candidatos_por_beneficiario[j]], 
         x[j, i, k] <= CAPACIDADE_MAX_MANANCIAL * z[j, i])
 
-    # Respeita o limite diário de viagens (12) que cada manancial consegue despachar
     @constraint(model, capDiariaManancial[i in nm, k in nd; !isempty([j for j in nb if i in candidatos_por_beneficiario[j]])],
         sum(x[j, i, k] for j in nb if i in candidatos_por_beneficiario[j]) <= CAPACIDADE_MAX_MANANCIAL)
 
-    # ==========================================
-    # CHECKPOINTS E EXECUÇÃO
-    # ==========================================
     horas_checkpoints = 1:24
     segundos_checkpoints = Float64.(horas_checkpoints .* 3600)
     
@@ -137,6 +118,8 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
 
         set_optimizer_attribute(model, "TimeLimit", tempo_restante)
         
+        GC.gc()
+        
         try
             optimize!(model)
         catch e
@@ -144,7 +127,11 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
                 println("Execução interrompida manualmente na hora $hora.")
                 if has_values(model) salvar_saidas(model, caminho_pasta, "$(hora)h_INT") end
                 return
-            else rethrow(e) end
+            else 
+                println("\nErro fatal encontrado (possível falta de memória): $e")
+                println("Abortando a execução para não entrar em loop de falhas.")
+                break 
+            end
         end
 
         tempo_acumulado = meta_tempo
@@ -171,9 +158,6 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     end
 end
 
-# ==========================================
-# EXTRAÇÃO DE DADOS
-# ==========================================
 function salvar_saidas(model, pasta, sufixo)
     val_x = value.(model[:x])
     val_z = value.(model[:z])
@@ -213,5 +197,4 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-# Execução
 rodar_modelo_integrado(0.00, "resultados00")
