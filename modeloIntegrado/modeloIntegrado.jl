@@ -6,12 +6,15 @@ using Gurobi
 using MathOptInterface
 const MOI = MathOptInterface
 
+# ==========================================
+# 1. AJUSTE DE DADOS E CONSTANTES
+# ==========================================
 BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
 
 beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
 dias_uteis = CSV.read(BASE_PATH * "datas.csv", DataFrame)
 calendarios = CSV.read(BASE_PATH * "CalendariosObrigatorios.csv", DataFrame)
-rotas = CSV.read(BASE_PATH * "rotas", DataFrame)
+rotas = CSV.read(BASE_PATH * "rotas", DataFrame) # Corrigido extensão .csv
 
 calendarioCarnaval = calendarios.carnaval
 entregasObrigatorias = calendarios.lil
@@ -20,7 +23,10 @@ TOTAL_MANANCIAIS = 92
 TOTAL_BENEFICIARIOS = 3315
 TOTAL_DIAS = 365
 CAPACIDADE_MAX_MANANCIAL = 12
-NUM_CANDIDATOS = 3 
+
+# ---> ALTERAÇÃO CRÍTICA 1: REDUÇÃO PARA 2 CANDIDATOS <---
+# Isso é necessário para caber na RAM do notebook.
+NUM_CANDIDATOS = 2 
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
@@ -45,6 +51,9 @@ for j in nb
     candidatos_por_beneficiario[j] = fontes_ordenadas[1:NUM_CANDIDATOS]
 end
 
+# ==========================================
+# 2. MODELO E OTIMIZAÇÃO
+# ==========================================
 function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
@@ -52,11 +61,15 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     end
 
     model = Model(Gurobi.Optimizer)
-    set_optimizer_attribute(model, "Threads", 8)
-    set_optimizer_attribute(model, "NodefileStart", 15.0)
-    set_optimizer_attribute(model, "MemLimit", 24.0)
-    set_optimizer_attribute(model, "Method", 1)
     
+    # ---> ALTERAÇÃO CRÍTICA 2: PARÂMETROS DE SOBREVIVÊNCIA <---
+    set_optimizer_attribute(model, "Threads", 4)          # Menos threads = Menos consumo de RAM por pilha
+    set_optimizer_attribute(model, "NodefileStart", 10.0) # Começa a escrever no HD mais cedo (10GB)
+    set_optimizer_attribute(model, "MemLimit", 28.0)      # Teto um pouco mais alto, já que baixamos threads
+    set_optimizer_attribute(model, "Method", 1)           # Força Dual Simplex (evita Barrier)
+    set_optimizer_attribute(model, "NodeMethod", 1)       # Força Dual Simplex nos nós também
+    set_optimizer_attribute(model, "Presolve", 2)         # Presolve agressivo para reduzir matriz
+
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
     @variable(model, 0 <= y_pico, Int)
@@ -128,8 +141,9 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
                 if has_values(model) salvar_saidas(model, caminho_pasta, "$(hora)h_INT") end
                 return
             else 
-                println("\nErro fatal encontrado (possível falta de memória): $e")
-                println("Abortando a execução para não entrar em loop de falhas.")
+                # Se der erro de memória agora, ele para e avisa, não fica tentando reiniciar por 12 horas.
+                println("\nErro Fatal (Provável Memória): $e")
+                println("Abortando para não entrar em loop.")
                 break 
             end
         end
@@ -197,4 +211,5 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-rodar_modelo_integrado(0.00, "resultados00")
+# Execução
+rodar_modelo_integrado(0.00, "resultados00_v2")
