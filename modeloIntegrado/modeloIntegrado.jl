@@ -14,36 +14,50 @@ BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
 beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
 dias_uteis = CSV.read(BASE_PATH * "datas.csv", DataFrame)
 calendarios = CSV.read(BASE_PATH * "CalendariosObrigatorios.csv", DataFrame)
-rotas = CSV.read(BASE_PATH * "rotas", DataFrame) # Corrigido extensão .csv
+rotas = CSV.read(BASE_PATH * "rotas", DataFrame)
 
 calendarioCarnaval = calendarios.carnaval
 entregasObrigatorias = calendarios.lil
 
 TOTAL_MANANCIAIS = 92
-TOTAL_BENEFICIARIOS = 3315
 TOTAL_DIAS = 365
 CAPACIDADE_MAX_MANANCIAL = 12
 
-# ---> ALTERAÇÃO CRÍTICA 1: REDUÇÃO PARA 2 CANDIDATOS <---
-# Isso é necessário para caber na RAM do notebook.
-NUM_CANDIDATOS = 2 
+# ---> CONFIGURAÇÃO DE TESTE REDUZIDO <---
+TOTAL_BENEFICIARIOS_ARQUIVO = size(beneficiarios_ativos, 1) # 3315 (Original)
+TOTAL_BENEFICIARIOS = 750 # Reduzido para teste
+
+# Redução de candidatos para economizar RAM
+NUM_CANDIDATOS = 5
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
 nm = 1:TOTAL_MANANCIAIS
 
 qtd_dias_uteis = sum(dias_uteis[:, 1]) 
-preU = [round(i * 0.02, digits=2) for i in beneficiarios_ativos.Pessoas_Atendidas]
-C = convert(Vector{Float64}, beneficiarios_ativos.Capacidade)
-U = [preU[j] for j in nb]
+
+# 1. Ajuste de U (Consumo) - Cortando para 1500
+preU_full = [round(i * 0.02, digits=2) for i in beneficiarios_ativos.Pessoas_Atendidas]
+U = preU_full[nb] 
+
+# 2. Ajuste de C (Capacidade) - Cortando para 1500
+C_full = convert(Vector{Float64}, beneficiarios_ativos.Capacidade)
+C = C_full[nb]
 
 Y = C ./ U
+
 quebra4 = [j for (j, x) in zip(nb, Y) if x < 5]
 quebra3 = [j for (j, x) in zip(nb, Y) if x < 4]
 quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
+# 3. Ajuste da Matriz de Distâncias Dij
 distancias = rotas.distance_w_factor
-Dij = reshape(distancias, (TOTAL_MANANCIAIS, TOTAL_BENEFICIARIOS))
+
+# Primeiro reshape com o tamanho ORIGINAL do arquivo (92 x 3315)
+Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS, TOTAL_BENEFICIARIOS_ARQUIVO))
+
+# Depois fatia apenas as 1500 colunas que vamos usar
+Dij = Dij_completa[:, nb]
 
 candidatos_por_beneficiario = Dict{Int, Vector{Int}}()
 for j in nb
@@ -62,13 +76,13 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
 
     model = Model(Gurobi.Optimizer)
     
-    # ---> ALTERAÇÃO CRÍTICA 2: PARÂMETROS DE SOBREVIVÊNCIA <---
-    set_optimizer_attribute(model, "Threads", 4)          # Menos threads = Menos consumo de RAM por pilha
-    set_optimizer_attribute(model, "NodefileStart", 10.0) # Começa a escrever no HD mais cedo (10GB)
-    set_optimizer_attribute(model, "MemLimit", 28.0)      # Teto um pouco mais alto, já que baixamos threads
-    set_optimizer_attribute(model, "Method", 1)           # Força Dual Simplex (evita Barrier)
-    set_optimizer_attribute(model, "NodeMethod", 1)       # Força Dual Simplex nos nós também
-    set_optimizer_attribute(model, "Presolve", 2)         # Presolve agressivo para reduzir matriz
+    # Parâmetros de sobrevivência
+    set_optimizer_attribute(model, "Threads", 4)          
+    set_optimizer_attribute(model, "NodefileStart", 10.0) 
+    set_optimizer_attribute(model, "MemLimit", 28.0)      
+    set_optimizer_attribute(model, "Method", 1)           
+    set_optimizer_attribute(model, "NodeMethod", 1)       
+    set_optimizer_attribute(model, "Presolve", 2)         
 
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
@@ -141,7 +155,6 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
                 if has_values(model) salvar_saidas(model, caminho_pasta, "$(hora)h_INT") end
                 return
             else 
-                # Se der erro de memória agora, ele para e avisa, não fica tentando reiniciar por 12 horas.
                 println("\nErro Fatal (Provável Memória): $e")
                 println("Abortando para não entrar em loop.")
                 break 
@@ -212,4 +225,4 @@ function salvar_saidas(model, pasta, sufixo)
 end
 
 # Execução
-rodar_modelo_integrado(0.00, "resultados00_v2")
+rodar_modelo_integrado(0.00, "resultados00_750")
