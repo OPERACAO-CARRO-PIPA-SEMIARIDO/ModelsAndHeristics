@@ -6,9 +6,6 @@ using Gurobi
 using MathOptInterface
 const MOI = MathOptInterface
 
-# ==========================================
-# 1. AJUSTE DE DADOS E CONSTANTES
-# ==========================================
 BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
 
 beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
@@ -19,55 +16,44 @@ rotas = CSV.read(BASE_PATH * "rotas", DataFrame)
 calendarioCarnaval = calendarios.carnaval
 entregasObrigatorias = calendarios.lil
 
-TOTAL_MANANCIAIS = 92
-TOTAL_DIAS = 365
+TOTAL_BENEFICIARIOS_ARQUIVO = size(beneficiarios_ativos, 1)
+TOTAL_MANANCIAIS_ARQUIVO = 92 
 CAPACIDADE_MAX_MANANCIAL = 12
 
 # ---> CONFIGURAÇÃO DE TESTE REDUZIDO <---
-TOTAL_BENEFICIARIOS_ARQUIVO = size(beneficiarios_ativos, 1) # 3315 (Original)
-TOTAL_BENEFICIARIOS = 750 # Reduzido para teste
-
-# Redução de candidatos para economizar RAM
-NUM_CANDIDATOS = 5
+TOTAL_BENEFICIARIOS = 3315
+TOTAL_MANANCIAIS = 92
+TOTAL_DIAS = 270
+NUM_CANDIDATOS = 1
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
 nm = 1:TOTAL_MANANCIAIS
 
-qtd_dias_uteis = sum(dias_uteis[:, 1]) 
+qtd_dias_uteis = sum(dias_uteis[nd, 1]) 
 
-# 1. Ajuste de U (Consumo) - Cortando para 1500
 preU_full = [round(i * 0.02, digits=2) for i in beneficiarios_ativos.Pessoas_Atendidas]
 U = preU_full[nb] 
 
-# 2. Ajuste de C (Capacidade) - Cortando para 1500
 C_full = convert(Vector{Float64}, beneficiarios_ativos.Capacidade)
 C = C_full[nb]
 
 Y = C ./ U
-
 quebra4 = [j for (j, x) in zip(nb, Y) if x < 5]
 quebra3 = [j for (j, x) in zip(nb, Y) if x < 4]
 quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
-# 3. Ajuste da Matriz de Distâncias Dij
 distancias = rotas.distance_w_factor
+Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS_ARQUIVO, TOTAL_BENEFICIARIOS_ARQUIVO))
+Dij = Dij_completa[nm, nb]
 
-# Primeiro reshape com o tamanho ORIGINAL do arquivo (92 x 3315)
-Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS, TOTAL_BENEFICIARIOS_ARQUIVO))
-
-# Depois fatia apenas as 1500 colunas que vamos usar
-Dij = Dij_completa[:, nb]
-
+CANDIDATOS_REAIS = min(NUM_CANDIDATOS, TOTAL_MANANCIAIS)
 candidatos_por_beneficiario = Dict{Int, Vector{Int}}()
 for j in nb
     fontes_ordenadas = sortperm(Dij[:, j])
-    candidatos_por_beneficiario[j] = fontes_ordenadas[1:NUM_CANDIDATOS]
+    candidatos_por_beneficiario[j] = fontes_ordenadas[1:CANDIDATOS_REAIS]
 end
 
-# ==========================================
-# 2. MODELO E OTIMIZAÇÃO
-# ==========================================
 function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
@@ -76,8 +62,6 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
 
     model = Model(Gurobi.Optimizer)
     
-    # Parâmetros de sobrevivência
-    set_optimizer_attribute(model, "Threads", 4)          
     set_optimizer_attribute(model, "NodefileStart", 10.0) 
     set_optimizer_attribute(model, "MemLimit", 28.0)      
     set_optimizer_attribute(model, "Method", 1)           
@@ -224,5 +208,4 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-# Execução
-rodar_modelo_integrado(0.00, "resultados00_750")
+rodar_modelo_integrado(0.00, "resultados00_3315_270")
