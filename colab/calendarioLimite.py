@@ -7,7 +7,8 @@ import os
 # Defina a capacidade do caminhão (baseado no seu código Julia: 13.0)
 CAPACIDADE_CAMINHAO = 13.0 
 # Caminhos dos arquivos (Baseado no seu snippet Julia)
-BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
+#BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
+BASE_PATH = "/home/guilherme/repos/backup/AlocacaoCarrosPipas/Dados"
 ARQUIVO_BENEFICIARIOS = os.path.join(BASE_PATH, "Beneficiarios_RN_Ativos1.csv")
 ARQUIVO_DATAS = os.path.join(BASE_PATH, "datas.csv")
 # O arquivo de calendários não parecia ser usado explicitamente na lógica do loop Python fornecido, 
@@ -30,7 +31,7 @@ ids_beneficiarios = beneficiarios_total.index # Ou use uma coluna de ID se houve
 
 # Configurar Horizonte de Planejamento
 # O Julia usa nd = 1:90. Vamos assumir o tamanho do arquivo datas.csv
-num_dias = len(dias_uteis_df)
+num_dias = 150
 dias_range = range(num_dias)
 
 # Identificar dias não úteis (Assumindo que 0 = Não útil no arquivo datas.csv)

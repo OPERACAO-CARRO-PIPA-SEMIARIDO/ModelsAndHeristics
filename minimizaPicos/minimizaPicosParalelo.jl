@@ -18,10 +18,11 @@ calendarios = CSV.read(BASE_PATH * "/CalendariosObrigatorios.csv", DataFrame)
 calendarioCarnaval = calendarios.carnaval
 entregasObrigatorias = calendarios.lil
 duas_colunas_b = [beneficiarios_ativos.Capacidade, beneficiarios_ativos.Pessoas_Atendidas]
-qtd_dias_uteis = sum(dias_uteis[:, 1]) 
 
 nb = 1:3315
-nd = 1:365
+nd = 1:150
+
+qtd_dias_uteis = sum(dias_uteis[nd, 1]) 
 
 preU = [round(i * 0.02, digits=2) for i in duas_colunas_b[2]]
 preC = convert(Vector{Float64}, duas_colunas_b[1])
@@ -230,10 +231,10 @@ end
 # Supondo que você tem um arquivo chamado "abastecimento_72h.csv" na pasta "resultadosControle"
 # e quer rodar um novo cenário (ex: p=0.25) usando ele como base.
 
-path_start = BASE_PATH * "abastecimento_diario_py.csv"
+#path_start = BASE_PATH * "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_150/abastecimento_limite_150"
 #path_start = joinpath(pwd(), "resultados00/abastecimento_24h.csv")
 
 # Verifique se o arquivo existe antes de rodar, ou deixe a função avisar
-rodar_cenario(0.00, "resultados00_350wLim"; arquivo_warm_start = path_start)
+rodar_cenario(0.00, "resultados00_150")
 
 println("\nEXECUÇÃO FINALIZADA.")

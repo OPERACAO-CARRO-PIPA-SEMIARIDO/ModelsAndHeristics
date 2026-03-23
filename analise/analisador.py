@@ -139,7 +139,7 @@ class AnalisadorAlocacao:
 # EXEMPLO DE USO
 # ==========================================
 if __name__ == "__main__":
-    ARQUIVO_ALOCACAO = "/home/guilherme/ModelsAndHeristics/alocacao/saidas_2/alocacao_10wLim/alocacao_m2.csv" 
+    ARQUIVO_ALOCACAO = "/home/guilherme/ModelsAndHeristics/modeloIntegrado/resultados00_3315_150_v2/alocacao_2h.csv" 
     ARQUIVO_ROTAS = "/home/guilherme/repos/backup/AlocacaoCarrosPipas/Dados/rotas" 
     # Adicione o caminho do arquivo de beneficiários aqui
     ARQUIVO_BENEFICIARIOS = "/home/guilherme/repos/backup/AlocacaoCarrosPipas/Dados/Beneficiarios_RN_Ativos1.csv"

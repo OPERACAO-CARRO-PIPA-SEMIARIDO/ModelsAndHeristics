@@ -7,8 +7,8 @@ import subprocess
 # 1. DEFINIÇÃO DE CAMINHOS BASE (Dinâmico)
 # ==========================================
 PASTA_BASE = Path(__file__).parent.resolve()
-PASTA_ENTRADAS = PASTA_BASE / "entradas"
-PASTA_SAIDAS = PASTA_BASE / "saidas_2"
+PASTA_ENTRADAS = PASTA_BASE / "entradas_150"
+PASTA_SAIDAS = PASTA_BASE / "saidas_150"
 
 ARQUIVO_ROTAS = PASTA_BASE / "Dados" / "rotas"
 
