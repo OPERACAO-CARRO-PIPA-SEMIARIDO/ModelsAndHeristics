@@ -54,7 +54,9 @@ for j in nb
     candidatos_por_beneficiario[j] = fontes_ordenadas[1:CANDIDATOS_REAIS]
 end
 
-function rodar_modelo_integrado(p::Float64, nome_pasta::String)
+function rodar_modelo_integrado(p::Float64, nome_pasta::String; 
+                                abastecimento_warm_start=nothing, 
+                                alocacao_warm_start=nothing)
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
         mkpath(caminho_pasta)
@@ -104,6 +106,59 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
 
     @constraint(model, capDiariaManancial[i in nm, k in nd; !isempty([j for j in nb if i in candidatos_por_beneficiario[j]])],
         sum(x[j, i, k] for j in nb if i in candidatos_por_beneficiario[j]) <= CAPACIDADE_MAX_MANANCIAL)
+
+    # ... [Warm Start logic remains the same] ...
+    # (Leaving this comment to indicate I'm not changing the warm start block itself, 
+    # but the replace tool needs enough context)
+
+    # --- LÓGICA DE WARM START ---
+    if !isnothing(abastecimento_warm_start) && isfile(abastecimento_warm_start) &&
+       !isnothing(alocacao_warm_start) && isfile(alocacao_warm_start)
+        println(">>> Carregando Warm Start...")
+        try
+            df_abast = CSV.read(abastecimento_warm_start, DataFrame)
+            df_aloc = CSV.read(alocacao_warm_start, DataFrame)
+            
+            for row_idx in 1:size(df_abast, 1)
+                j_id = hasproperty(df_abast, :Beneficiarios) ? df_abast[row_idx, :Beneficiarios] : df_abast[row_idx, 1]
+                if !(j_id in nb) continue end
+                
+                fonte_escolhida = 0
+                for k in nd
+                    col_sym = Symbol(string(k))
+                    if hasproperty(df_aloc, col_sym)
+                        val_i = df_aloc[row_idx, col_sym]
+                        if !ismissing(val_i) && val_i > 0
+                            fonte_escolhida = Int(val_i)
+                            break
+                        end
+                    end
+                end
+                
+                if fonte_escolhida > 0 && fonte_escolhida in candidatos_por_beneficiario[j_id]
+                    set_start_value(z[j_id, fonte_escolhida], 1.0)
+                    for i in candidatos_por_beneficiario[j_id]
+                        if i != fonte_escolhida
+                            set_start_value(z[j_id, i], 0.0)
+                        end
+                    end
+                    
+                    for k in nd
+                        col_sym = Symbol(string(k))
+                        if hasproperty(df_abast, col_sym)
+                            val_x = df_abast[row_idx, col_sym]
+                            if !ismissing(val_x)
+                                set_start_value(x[j_id, fonte_escolhida, k], Float64(val_x))
+                            end
+                        end
+                    end
+                end
+            end
+            println(">>> Warm Start carregado com sucesso.")
+        catch e
+            println(">>> Erro ao carregar Warm Start: $e")
+        end
+    end
 
     horas_checkpoints = 1:24
     segundos_checkpoints = Float64.(horas_checkpoints .* 3600)
@@ -167,6 +222,19 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
                 salvar_saidas(model, caminho_pasta, "melhor_absoluto")
             end
         end
+            obj = objective_value(model)
+            bound = try objective_bound(model) catch; -1.0 end 
+            gap = try MOI.get(model, MOI.RelativeGap()) * 100 catch; 0.0 end
+            
+            val_pico = round(Int, value(y_pico))
+            val_custo = value(expr_custo)
+            val_entregas = round(Int, value(expr_entregas))
+
+            push!(df_historico, (hora, tempo_acumulado, obj, bound, gap, val_pico, val_custo, val_entregas))
+            CSV.write(joinpath(caminho_pasta, "historico_controle.csv"), df_historico)
+            
+            salvar_saidas(model, caminho_pasta, "$(hora)h")
+        end
 
         if termination_status(model) == MOI.OPTIMAL
             println("Solução Ótima comprovada. Finalizando execução.")
@@ -214,4 +282,9 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-rodar_modelo_integrado(0.00, "resultados00_3315_150_v3")
+# Exemplo de uso:
+# rodar_modelo_integrado(0.00, "resultados00_warm", 
+#                        abastecimento_warm_start="resultados00_3315_150_v3/abastecimento_1h.csv", 
+#                        alocacao_warm_start="resultados00_3315_150_v3/alocacao_1h.csv")
+
+rodar_modelo_integrado(0.00, "resultados00_3315_150_v4")

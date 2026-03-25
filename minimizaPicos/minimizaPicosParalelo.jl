@@ -48,6 +48,7 @@ function rodar_cenario(p_valor, nome_pasta; arquivo_warm_start=nothing)
     
     # --- CONFIGURAÇÃO DE HARDWARE (Segurança) ---
     set_optimizer_attribute(model, "NodefileStart", 20.0)
+    set_optimizer_attribute(model, "MIPFocus", 1) # Prioritize finding feasible solutions
       
     @variable(model, 0 <= x[j in nb, k in nd], Int)
     @variable(model, 0 <= V[j in nb, k in nd])
@@ -156,6 +157,7 @@ function rodar_cenario(p_valor, nome_pasta; arquivo_warm_start=nothing)
     )
     
     tempo_acumulado_anterior = 0.0
+    melhor_obj_encontrado = Inf
 
     for (meta_tempo_total, sufixo) in zip(checkpoints_segundos, nomes_arquivos)
         tempo_para_rodar = meta_tempo_total - tempo_acumulado_anterior
@@ -193,7 +195,14 @@ function rodar_cenario(p_valor, nome_pasta; arquivo_warm_start=nothing)
             push!(df_historico, (sufixo, meta_tempo_total, obj, bound, gap, soma_x, pico))
             CSV.write(joinpath(nome_pasta, "historico_controle.csv"), df_historico)
             
-            salvar_arquivos(model, nome_pasta, sufixo, nb, nd)
+            # Só salva se for a melhor solução vista até agora
+            if obj < melhor_obj_encontrado
+                println(">>> Melhor solução encontrada ($sufixo): Obj = $obj")
+                melhor_obj_encontrado = obj
+                salvar_arquivos(model, nome_pasta, sufixo, nb, nd)
+                # Salva uma cópia fixa para garantir que o melhor está sempre acessível
+                salvar_arquivos(model, nome_pasta, "melhor_absoluto", nb, nd)
+            end
         else
             println(" > Ainda sem solução viável.")
         end
