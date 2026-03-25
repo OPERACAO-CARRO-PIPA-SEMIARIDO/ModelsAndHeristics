@@ -23,8 +23,8 @@ CAPACIDADE_MAX_MANANCIAL = 12
 # ---> CONFIGURAÇÃO DE TESTE REDUZIDO <---
 TOTAL_BENEFICIARIOS = 3315
 TOTAL_MANANCIAIS = 92
-TOTAL_DIAS = 270
-NUM_CANDIDATOS = 1
+TOTAL_DIAS = 150
+NUM_CANDIDATOS = 5
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
@@ -64,9 +64,9 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     
     set_optimizer_attribute(model, "NodefileStart", 10.0) 
     set_optimizer_attribute(model, "MemLimit", 28.0)      
-    set_optimizer_attribute(model, "Method", 1)           
-    set_optimizer_attribute(model, "NodeMethod", 1)       
-    set_optimizer_attribute(model, "Presolve", 2)         
+    #set_optimizer_attribute(model, "Method", 1)           
+    #set_optimizer_attribute(model, "NodeMethod", 1)       
+    #set_optimizer_attribute(model, "Presolve", 2)         
 
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
@@ -208,4 +208,4 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-rodar_modelo_integrado(0.00, "resultados00_3315_270")
+rodar_modelo_integrado(0.00, "resultados00_3315_150_v3")

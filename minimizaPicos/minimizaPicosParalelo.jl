@@ -71,7 +71,6 @@ function rodar_cenario(p_valor, nome_pasta; arquivo_warm_start=nothing)
     @constraint(model, carnavalAbastecimento[j in quebra4, k in nd; calendarioCarnaval[k] == 1], x[j, k] >= 1)
     @constraint(model, lilAbastecimento[j in quebra2, k in nd; entregasObrigatorias[k] == 1], x[j, k] >= 1)
 
-    @constraint(model, picoMaximo, y <= 350.0)
 
     # --- LÓGICA DE WARM START (NOVO) ---
     if !isnothing(arquivo_warm_start) && isfile(arquivo_warm_start)
@@ -231,10 +230,10 @@ end
 # Supondo que você tem um arquivo chamado "abastecimento_72h.csv" na pasta "resultadosControle"
 # e quer rodar um novo cenário (ex: p=0.25) usando ele como base.
 
-#path_start = BASE_PATH * "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_150/abastecimento_limite_150"
+path_start = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_150/abastecimento_limite_150.csv"
 #path_start = joinpath(pwd(), "resultados00/abastecimento_24h.csv")
 
 # Verifique se o arquivo existe antes de rodar, ou deixe a função avisar
-rodar_cenario(0.00, "resultados00_150")
+rodar_cenario(0.10, "resultados10wlim_150"; arquivo_warm_start = path_start )
 
 println("\nEXECUÇÃO FINALIZADA.")
