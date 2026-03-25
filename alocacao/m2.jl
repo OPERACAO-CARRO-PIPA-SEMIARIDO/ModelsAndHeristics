@@ -9,10 +9,10 @@ using Gurobi
 # ==========================================
 BASE_FILE = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics"
 
-ABASTECIMENTO_FILE = BASE_FILE * "/minimizaPicos/resultados10wLim/abastecimento_24h.csv"
+ABASTECIMENTO_FILE = BASE_FILE * "/minimizaPicos/resultados00_150/abastecimento_1min.csv"
 ROTAS_FILE = BASE_FILE * "/alocacao/Dados/rotas"
-OUTPUT_ALOCACAO = BASE_FILE * "/alocacao/m2/m2_10wlim_alocacao.csv"
-OUTPUT_CUSTO = BASE_FILE * "/alocacao/m2/m2_10wlim_custo.csv"
+OUTPUT_ALOCACAO = BASE_FILE * "/alocacao/m2/m2_00_150_alocacao.csv"
+OUTPUT_CUSTO = BASE_FILE * "/alocacao/m2/m2_10_150_custo.csv"
 
 # ==========================================
 # 2. LEITURA E PREPARAÇÃO DOS DADOS
@@ -22,7 +22,7 @@ rotas = CSV.read(ROTAS_FILE, DataFrame)
 
 NUM_MANANCIAIS_TESTE = 92 
 NUM_BENEFICIARIOS_TESTE = 3315
-NUM_DIAS_TESTE = 365
+NUM_DIAS_TESTE = 150
 CAPACIDADE_MAX_MANANCIAL = 12
 
 TOTAL_MANANCIAIS_BASE = 92
@@ -43,8 +43,8 @@ function resolve_M2(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
     
     # Parâmetros de performance e controle
     set_time_limit_sec(linModel, 86400.0) # 24 horas
-    set_optimizer_attribute(linModel, "MIPFocus", 1) 
-    set_optimizer_attribute(linModel, "NodefileStart", 4.0) 
+    #set_optimizer_attribute(linModel, "MIPFocus", 1) 
+    set_optimizer_attribute(linModel, "NodefileStart", 10.0) 
 
     # Variáveis condicionais (só cria memória se houver demanda)
     @variable(linModel, 0 <= x[i=1:NM, j=1:NB, k=1:ND; matriz_demanda[j,k] > 0], Int) 
