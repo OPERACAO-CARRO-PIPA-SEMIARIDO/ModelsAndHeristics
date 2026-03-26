@@ -107,10 +107,6 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
     @constraint(model, capDiariaManancial[i in nm, k in nd; !isempty([j for j in nb if i in candidatos_por_beneficiario[j]])],
         sum(x[j, i, k] for j in nb if i in candidatos_por_beneficiario[j]) <= CAPACIDADE_MAX_MANANCIAL)
 
-    # ... [Warm Start logic remains the same] ...
-    # (Leaving this comment to indicate I'm not changing the warm start block itself, 
-    # but the replace tool needs enough context)
-
     # --- LÓGICA DE WARM START ---
     if !isnothing(abastecimento_warm_start) && isfile(abastecimento_warm_start) &&
        !isnothing(alocacao_warm_start) && isfile(alocacao_warm_start)
@@ -213,27 +209,12 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
             push!(df_historico, (hora, tempo_acumulado, obj, bound, gap, val_pico, val_custo, val_entregas))
             CSV.write(joinpath(caminho_pasta, "historico_controle.csv"), df_historico)
             
-            # Só salva se for a melhor solução vista até agora
             if obj < melhor_obj_encontrado
                 println(">>> Melhor solução encontrada na hora $hora: Obj = $obj")
                 melhor_obj_encontrado = obj
                 salvar_saidas(model, caminho_pasta, "$(hora)h")
-                # Salva uma cópia fixa para garantir que o melhor está sempre acessível
                 salvar_saidas(model, caminho_pasta, "melhor_absoluto")
             end
-        end
-            obj = objective_value(model)
-            bound = try objective_bound(model) catch; -1.0 end 
-            gap = try MOI.get(model, MOI.RelativeGap()) * 100 catch; 0.0 end
-            
-            val_pico = round(Int, value(y_pico))
-            val_custo = value(expr_custo)
-            val_entregas = round(Int, value(expr_entregas))
-
-            push!(df_historico, (hora, tempo_acumulado, obj, bound, gap, val_pico, val_custo, val_entregas))
-            CSV.write(joinpath(caminho_pasta, "historico_controle.csv"), df_historico)
-            
-            salvar_saidas(model, caminho_pasta, "$(hora)h")
         end
 
         if termination_status(model) == MOI.OPTIMAL
@@ -283,8 +264,6 @@ function salvar_saidas(model, pasta, sufixo)
 end
 
 # Exemplo de uso:
-# rodar_modelo_integrado(0.00, "resultados00_warm", 
-#                        abastecimento_warm_start="resultados00_3315_150_v3/abastecimento_1h.csv", 
-#                        alocacao_warm_start="resultados00_3315_150_v3/alocacao_1h.csv")
-
-rodar_modelo_integrado(0.00, "resultados00_3315_150_v4")
+alocacao_path = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/saidas_150/alocacao_abastecimento_00_150_2/alocacao_m2.csv"
+abastecimento_path = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_150/abastecimento_00_150_2.csv"
+rodar_modelo_integrado(0.00, "resultados00w_min00_m2", abastecimento_warm_start=abastecimento_path, alocacao_warm_start=alocacao_path)
