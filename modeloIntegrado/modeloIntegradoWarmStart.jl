@@ -156,7 +156,7 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
         end
     end
 
-    horas_checkpoints = 1:24
+    horas_checkpoints = 3:3:24
     segundos_checkpoints = Float64.(horas_checkpoints .* 3600)
     
     df_historico = DataFrame(

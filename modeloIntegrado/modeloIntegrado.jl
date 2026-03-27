@@ -105,7 +105,7 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     @constraint(model, capDiariaManancial[i in nm, k in nd; !isempty([j for j in nb if i in candidatos_por_beneficiario[j]])],
         sum(x[j, i, k] for j in nb if i in candidatos_por_beneficiario[j]) <= CAPACIDADE_MAX_MANANCIAL)
 
-    horas_checkpoints = 1:24
+    horas_checkpoints = 3:3:24
     segundos_checkpoints = Float64.(horas_checkpoints .* 3600)
     
     df_historico = DataFrame(
