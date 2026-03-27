@@ -10,13 +10,14 @@ const MOI = MathOptInterface
 # No Linux, o caminho original pode precisar ser adaptado.
 # Como o usuário está no Linux (/home/guilherme/...), vou usar caminhos relativos ou permitir customização.
 
+const BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
+
 function rodar_rolling_horizon(
     p::Float64, 
     nome_pasta::String, 
     dia_inicio::Int, 
     num_dias_periodo::Int;
     caminho_volumes_iniciais=nothing,
-    caminho_base_dados="../alocacao/Dados/", # Ajustado para o ambiente local
     abastecimento_warm_start=nothing,
     alocacao_warm_start=nothing
 )
@@ -25,11 +26,11 @@ function rodar_rolling_horizon(
         mkpath(caminho_pasta)
     end
 
-    # Carregamento de dados
-    beneficiarios_ativos = CSV.read(joinpath(caminho_base_dados, "Beneficiarios_RN_Ativos1.csv"), DataFrame)
-    dias_uteis_full = CSV.read(joinpath(caminho_base_dados, "datas.csv"), DataFrame)
-    calendarios_full = CSV.read(joinpath(caminho_base_dados, "CalendariosObrigatorios.csv"), DataFrame)
-    rotas = CSV.read(joinpath(caminho_base_dados, "rotas"), DataFrame)
+    # Carregamento de dados (Estilo Windows hardcoded)
+    beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
+    dias_uteis_full = CSV.read(BASE_PATH * "datas.csv", DataFrame)
+    calendarios_full = CSV.read(BASE_PATH * "CalendariosObrigatorios.csv", DataFrame)
+    rotas = CSV.read(BASE_PATH * "rotas", DataFrame)
 
     TOTAL_BENEFICIARIOS = 3315
     TOTAL_MANANCIAIS = 92
@@ -144,7 +145,6 @@ function rodar_rolling_horizon(
         if tempo_restante <= 0 continue end
 
         set_optimizer_attribute(model, "TimeLimit", tempo_restante)
-        GC.gc()
         
         try
             optimize!(model)

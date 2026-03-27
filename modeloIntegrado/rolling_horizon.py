@@ -43,7 +43,8 @@ def executar_rolling_horizon():
             cmd.append(str(volumes_iniciais))
             
         try:
-            subprocess.run(cmd, check=True)
+            # shell=True as vezes ajuda no Windows para achar comandos no PATH
+            subprocess.run(cmd, check=True, shell=(os.name == 'nt'))
             
             # Atualiza volumes iniciais para o próximo período
             volumes_finais_path = pasta_periodo / "volumes_finais.csv"

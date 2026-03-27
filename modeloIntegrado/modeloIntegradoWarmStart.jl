@@ -179,8 +179,6 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
 
         set_optimizer_attribute(model, "TimeLimit", tempo_restante)
         
-        GC.gc()
-        
         try
             optimize!(model)
         catch e
