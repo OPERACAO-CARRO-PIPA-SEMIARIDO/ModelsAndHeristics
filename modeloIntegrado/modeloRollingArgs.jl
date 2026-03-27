@@ -11,6 +11,8 @@ const MOI = MathOptInterface
 # Como o usuário está no Linux (/home/guilherme/...), vou usar caminhos relativos ou permitir customização.
 
 const BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
+const TOTAL_MANANCIAIS_ARQUIVO = 92
+const CAPACIDADE_MAX_MANANCIAL = 12
 
 function rodar_rolling_horizon(
     p::Float64, 
@@ -43,6 +45,7 @@ function rodar_rolling_horizon(
 
     calendarioCarnaval = calendarios_full.carnaval[nd_global]
     entregasObrigatorias = calendarios_full.lil[nd_global]
+    # Garantir que dias_uteis seja um vetor para evitar erros de indexação
     dias_uteis = dias_uteis_full[nd_global, 1]
 
     nb = 1:TOTAL_BENEFICIARIOS
@@ -58,10 +61,11 @@ function rodar_rolling_horizon(
 
     Y = C ./ U
     quebra4 = [j for (j, x) in zip(nb, Y) if x < 5]
+    quebra3 = [j for (j, x) in zip(nb, Y) if x < 4]
     quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
     distancias = rotas.distance_w_factor
-    Dij_completa = reshape(distancias, (92, size(beneficiarios_ativos, 1)))
+    Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS_ARQUIVO, size(beneficiarios_ativos, 1)))
     Dij = Dij_completa[nm, nb]
 
     CANDIDATOS_REAIS = min(NUM_CANDIDATOS, TOTAL_MANANCIAIS)
@@ -95,8 +99,8 @@ function rodar_rolling_horizon(
     else
         println(">>> Carregando volumes iniciais de: $caminho_volumes_iniciais")
         df_vol_init = CSV.read(caminho_volumes_iniciais, DataFrame)
-        # Assume que o CSV tem colunas "Beneficiario" e "Volume"
-        vol_dict = Dict(row.Beneficiario => row.Volume for row in eachrow(df_vol_init))
+        # Garantir que as colunas sejam tratadas corretamente (Beneficiario, Volume)
+        vol_dict = Dict(row[1] => row[2] for row in eachrow(df_vol_init))
         @constraint(model, balancoVolumeInicial[j in nb], V[j, 1] == get(vol_dict, j, C[j]))
     end
     
@@ -127,10 +131,9 @@ function rodar_rolling_horizon(
     @constraint(model, capDiariaManancial[i in nm, k in nd_local; !isempty([j for j in nb if i in candidatos_por_beneficiario[j]])],
         sum(x[j, i, k] for j in nb if i in candidatos_por_beneficiario[j]) <= CAPACIDADE_MAX_MANANCIAL)
 
-    # Lógica de Warm Start (Opcional, mas mantida por compatibilidade)
+    # Lógica de Warm Start (Simplificada para Rolling)
     if !isnothing(abastecimento_warm_start) && isfile(abastecimento_warm_start)
-        println(">>> Carregando Warm Start de Abastecimento...")
-        # Lógica simplificada de warm start...
+        println(">>> Tentativa de Warm Start ignorada nesta versão do Rolling.")
     end
 
     # Checkpoints a cada 3 horas
@@ -158,9 +161,9 @@ function rodar_rolling_horizon(
         if has_values(model)
             obj = objective_value(model)
             if obj < melhor_obj_encontrado
+                println(">>> Melhor solução (Rolling) encontrada na hora $hora: Obj = $obj")
                 melhor_obj_encontrado = obj
                 salvar_saidas_rolling(model, caminho_pasta, "melhor_absoluto", nb, nd_local, candidatos_por_beneficiario)
-                # Salvar volumes finais para o próximo período
                 salvar_volumes_finais(model, caminho_pasta, "volumes_finais", nb, num_dias_periodo)
             end
         end
