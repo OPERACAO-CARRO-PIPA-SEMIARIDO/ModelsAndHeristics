@@ -12,14 +12,24 @@ PATH_ROTAS = os.path.join(DATA_PATH, "rotas")
 OUTPUT_DIR = os.path.join(REPO_PATH, "colab/")
 CAPACIDADE_MANANCIAL_DIA = 12.0
 
+# Permite limitar o número de beneficiários para testes rápidos
+# Pode ser passado via linha de comando: python heuristicaAlocacao.py 100
+LIMIT_BENEFICIARIES = int(sys.argv[1]) if len(sys.argv) > 1 else None
+
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
 
 print("--- INICIANDO EXECUÇÃO CORRIGIDA ---")
+if LIMIT_BENEFICIARIES:
+    print(f"MODO DE TESTE: Limitando a {LIMIT_BENEFICIARIES} beneficiários.")
 
 # --- 1. Carregamento Seguro ---
 try:
     df_abastecimento = pd.read_csv(PATH_ABASTECIMENTO)
+    
+    if LIMIT_BENEFICIARIES:
+        df_abastecimento = df_abastecimento.head(LIMIT_BENEFICIARIES)
+        
     # Separa IDs dos dados de demanda
     ids_beneficiarios = df_abastecimento.iloc[:, 0].values
     matriz_demanda = df_abastecimento.iloc[:, 1:].values.astype(float)

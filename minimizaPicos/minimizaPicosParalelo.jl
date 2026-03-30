@@ -19,7 +19,7 @@ calendarioCarnaval = calendarios.carnaval
 entregasObrigatorias = calendarios.lil
 duas_colunas_b = [beneficiarios_ativos.Capacidade, beneficiarios_ativos.Pessoas_Atendidas]
 
-nb = 1:3315
+nb = 1:1500
 nd = 1:150
 
 qtd_dias_uteis = sum(dias_uteis[nd, 1]) 
@@ -239,10 +239,11 @@ end
 # Supondo que você tem um arquivo chamado "abastecimento_72h.csv" na pasta "resultadosControle"
 # e quer rodar um novo cenário (ex: p=0.25) usando ele como base.
 
-path_start = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_150/abastecimento_limite_150.csv"
+#path_start = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_1500/abastecimento_limite_150a.csv"
 #path_start = joinpath(pwd(), "resultados00/abastecimento_24h.csv")
 
 # Verifique se o arquivo existe antes de rodar, ou deixe a função avisar
-rodar_cenario(0.10, "resultados10wlim_150"; arquivo_warm_start = path_start )
+#rodar_cenario(0.10, "resultados10wlim_1500"; arquivo_warm_start = path_start )
+rodar_cenario(0.00, "resultados00_1500")
 
 println("\nEXECUÇÃO FINALIZADA.")

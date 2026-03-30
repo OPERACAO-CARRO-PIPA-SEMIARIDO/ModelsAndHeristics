@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import time
 import os
+import sys
 
 # --- Configurações Iniciais ---
 # Defina a capacidade do caminhão (baseado no seu código Julia: 13.0)
@@ -11,14 +12,22 @@ CAPACIDADE_CAMINHAO = 13.0
 BASE_PATH = "/home/guilherme/repos/backup/AlocacaoCarrosPipas/Dados"
 ARQUIVO_BENEFICIARIOS = os.path.join(BASE_PATH, "Beneficiarios_RN_Ativos1.csv")
 ARQUIVO_DATAS = os.path.join(BASE_PATH, "datas.csv")
-# O arquivo de calendários não parecia ser usado explicitamente na lógica do loop Python fornecido, 
-# mas se precisar das exceções de carnaval, deve ser carregado aqui.
+
+# Permite limitar o número de beneficiários para testes rápidos
+# Pode ser passado via linha de comando: python calendarioLimite.py 100
+LIMIT_BENEFICIARIES = int(sys.argv[1]) if len(sys.argv) > 1 else None
 
 print("--- Iniciando Processamento Local ---")
+if LIMIT_BENEFICIARIES:
+    print(f"MODO DE TESTE: Limitando a {LIMIT_BENEFICIARIES} beneficiários.")
 
 # --- Leitura e Preparação dos Dados ---
 try:
     beneficiarios_total = pd.read_csv(ARQUIVO_BENEFICIARIOS)
+    
+    if LIMIT_BENEFICIARIES:
+        beneficiarios_total = beneficiarios_total.head(LIMIT_BENEFICIARIES)
+        
     dias_uteis_df = pd.read_csv(ARQUIVO_DATAS) # Assume coluna 1 com 0 ou 1
 except FileNotFoundError as e:
     print(f"Erro: Arquivo não encontrado. Verifique os caminhos.\n{e}")
