@@ -23,8 +23,8 @@ CAPACIDADE_MAX_MANANCIAL = 12
 # ---> CONFIGURAÇÃO DE TESTE REDUZIDO <---
 TOTAL_BENEFICIARIOS = 3315
 TOTAL_MANANCIAIS = 92
-TOTAL_DIAS = 150
-NUM_CANDIDATOS = 5
+TOTAL_DIAS = 60
+NUM_CANDIDATOS = 1
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
@@ -212,4 +212,4 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-rodar_modelo_integrado(0.00, "resultados00_3315_150_v3")
+rodar_modelo_integrado(0.00, "resultados00_3315_60")
