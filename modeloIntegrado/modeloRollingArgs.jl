@@ -70,7 +70,8 @@ function rodar_rolling_horizon(
 
     model = Model(Gurobi.Optimizer)
     
-    set_optimizer_attribute(model, "NodefileStart", 10.0) 
+    set_optimizer_attribute(model, "NodefileStart", 10.0)
+    set_optimizer_attribute(model, "MIPGap", 0.001) 
     set_optimizer_attribute(model, "MemLimit", 28.0)
     #set_optimizer_attribute(model, "MIPFocus", 1)
     set_optimizer_attribute(model, "Threads", 4)
