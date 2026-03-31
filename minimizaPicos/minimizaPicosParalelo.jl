@@ -49,7 +49,8 @@ function rodar_cenario(p_valor, nome_pasta; arquivo_warm_start=nothing)
     # --- CONFIGURAÇÃO DE HARDWARE (Segurança) ---
     set_optimizer_attribute(model, "NodefileStart", 20.0)
     set_optimizer_attribute(model, "MIPFocus", 1) # Prioritize finding feasible solutions
-      
+    set_optimizer_attribute(model, "MIPGap", 0.002)
+
     @variable(model, 0 <= x[j in nb, k in nd], Int)
     @variable(model, 0 <= V[j in nb, k in nd])
     @variable(model, 0 <= y, Int)
@@ -239,11 +240,11 @@ end
 # Supondo que você tem um arquivo chamado "abastecimento_72h.csv" na pasta "resultadosControle"
 # e quer rodar um novo cenário (ex: p=0.25) usando ele como base.
 
-#path_start = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_1500/abastecimento_limite_150a.csv"
+path_start = "C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_1500/abastecimento_limite_1500.csv"
 #path_start = joinpath(pwd(), "resultados00/abastecimento_24h.csv")
 
 # Verifique se o arquivo existe antes de rodar, ou deixe a função avisar
-#rodar_cenario(0.10, "resultados10wlim_1500"; arquivo_warm_start = path_start )
-rodar_cenario(0.00, "resultados00_1500")
+rodar_cenario(0.10, "resultados10wlim_1500"; arquivo_warm_start = path_start )
+#rodar_cenario(0.00, "resultados00_1500")
 
 println("\nEXECUÇÃO FINALIZADA.")

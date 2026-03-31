@@ -6,10 +6,10 @@ from pathlib import Path
 # Configurações
 JULIA_SCRIPT = "modeloSlidingArgs.jl"
 TOTAL_DIAS = 365
-WINDOW_SIZE = 90
+WINDOW_SIZE = 120
 OVERLAP = 14
 PESO_PICO = 0.0
-OUTPUT_BASE = "resultados_sliding_90_14"
+OUTPUT_BASE = "resultados_sliding_120_14"
 
 
 def executar_sliding_window():
