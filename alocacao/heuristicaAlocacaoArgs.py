@@ -21,13 +21,20 @@ try:
     ids_beneficiarios = df_abastecimento.iloc[:, 0].values
     matriz_demanda = df_abastecimento.iloc[:, 1:].values.astype(float)
     num_beneficiarios, num_dias = matriz_demanda.shape
+    
+    # Criar um mapeamento de ID do beneficiário (do CSV) para o índice na matriz (0 a num_beneficiarios-1)
+    # Assumimos que o ID no arquivo de rotas (id_beneficiario) corresponde ao valor na primeira coluna do abastecimento - 1
+    # Se o ID no CSV de abastecimento for 1, no rotas ele é 0.
+    map_id_para_idx = {int(id_b): i for i, id_b in enumerate(ids_beneficiarios)}
+    
 except Exception as e:
     print(f"ERRO ao ler abastecimento: {e}")
     sys.exit(1)
 
 try:
     df_rotas = pd.read_csv(PATH_ROTAS)
-    cols = df_rotas.columns.str.lower()
+    
+    # ... (busca de colunas mantida)
     col_ben = next((c for c in df_rotas.columns if 'beneficiario' in c.lower() or 'id_beneficiario' in c.lower()), None)
     col_fonte = next((c for c in df_rotas.columns if 'fonte' in c.lower() or 'id_fonte' in c.lower()), None)
     col_dist = next((c for c in df_rotas.columns if 'dist' in c.lower()), None)
@@ -43,11 +50,16 @@ try:
     matriz_custo = np.full((num_mananciais, num_beneficiarios), np.inf)
     
     for row in df_rotas.itertuples(index=False):
-        b_idx = int(row[idx_ben])
+        b_id_rotas = int(row[idx_ben])
         f_idx = int(row[idx_fonte])
         dist = float(row[idx_dist])
-        if b_idx < num_beneficiarios and f_idx < num_mananciais:
-            matriz_custo[f_idx, b_idx] = dist
+        
+        # O id_beneficiario no rotas começa em 0. No abastecimento começa em 1.
+        id_abastecimento = b_id_rotas + 1
+        
+        if id_abastecimento in map_id_para_idx and f_idx < num_mananciais:
+            idx_matriz = map_id_para_idx[id_abastecimento]
+            matriz_custo[f_idx, idx_matriz] = dist
 
 except Exception as e:
     print(f"ERRO CRÍTICO ao ler rotas: {e}")

@@ -30,14 +30,26 @@ tres_colunas_r[2] .+= 1.
 # Criar dataframe de saída idêntico ao de entrada para preenchimento
 df_alocacao = copy(abastecimento)
 
-# Detectar o número de dias (ND) dinamicamente baseado nas colunas do CSV de entrada
+# Detectar o número de dias (ND) e beneficiários (NB) dinamicamente baseado nas colunas do CSV de entrada
 NUM_DIAS = size(abastecimento, 2) - 1
+NUM_BENEFICIARIOS = size(abastecimento, 1)
 
 function retornaDados()
-    NB = 3315
+    NB_TOTAL_ROTAS = 3315
+    NB = NUM_BENEFICIARIOS
     Ajk = Matrix{Float64}(abastecimento[1:NB, 2:end])
     NM = 92
-    Dij = reshape(tres_colunas_r[3], (92, 3315))[1:NM, 1:NB]
+    
+    # O arquivo de rotas contém 3315 beneficiários para cada um dos 92 mananciais.
+    # Ele está ordenado por Manancial (0..91) e depois por Beneficiário (0..3314).
+    # Portanto, reshape(..., (3315, 92)) cria uma matriz onde cada coluna é um manancial.
+    # Transpomos para ter Dij[manancial, beneficiario].
+    distancias_vetor = tres_colunas_r[3]
+    Dij_completa = transpose(reshape(distancias_vetor, (NB_TOTAL_ROTAS, 92)))
+    
+    # Filtramos para os NB beneficiários presentes no arquivo de abastecimento
+    Dij = Dij_completa[1:NM, 1:NB]
+    
     ND = 1:NUM_DIAS
     CAPi = 12
     resp = stDados.instDados(Ajk, NM, NB, ND, Dij, CAPi)
