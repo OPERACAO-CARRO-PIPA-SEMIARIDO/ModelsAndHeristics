@@ -3,8 +3,8 @@ import numpy as np
 import time
 import sys
 
-if len(sys.argv) < 5:
-    print("Uso: python heuristica.py <planilha_entrada.csv> <planilha_saida_alocacao.csv> <planilha_saida_custos.csv> <planilha_rotas.csv>")
+if len(sys.argv) < 6:
+    print("Uso: python heuristica.py <planilha_entrada.csv> <planilha_saida_alocacao.csv> <planilha_saida_custos.csv> <planilha_rotas.csv> <num_mananciais>")
     sys.exit(1)
 
 # Recebendo os caminhos via linha de comando (passados pela automação)
@@ -12,6 +12,7 @@ PATH_ABASTECIMENTO = sys.argv[1]
 OUTPUT_ALOCACAO = sys.argv[2]
 OUTPUT_CUSTOS = sys.argv[3]
 PATH_ROTAS = sys.argv[4] # Caminho dinâmico das rotas
+num_mananciais = int(sys.argv[5])
 
 CAPACIDADE_MANANCIAL_DIA = 12.0
 
@@ -46,7 +47,6 @@ try:
         idx_fonte = df_rotas.columns.get_loc(col_fonte)
         idx_dist = df_rotas.columns.get_loc(col_dist) if col_dist else 2
 
-    num_mananciais = 92
     matriz_custo = np.full((num_mananciais, num_beneficiarios), np.inf)
     
     for row in df_rotas.itertuples(index=False):

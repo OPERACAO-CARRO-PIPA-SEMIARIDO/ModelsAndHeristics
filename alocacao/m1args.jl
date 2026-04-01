@@ -9,8 +9,8 @@ include(joinpath(@__DIR__, "dados.jl"))
 using .stDados
 
 # Recebendo os caminhos via linha de comando (passados pela automação)
-if length(ARGS) < 4
-    println("Uso: julia m1args.jl <planilha_entrada.csv> <planilha_saida_alocacao.csv> <planilha_saida_custos.csv> <planilha_rotas.csv>")
+if length(ARGS) < 5
+    println("Uso: julia m1args.jl <planilha_entrada.csv> <planilha_saida_alocacao.csv> <planilha_saida_custos.csv> <planilha_rotas.csv> <num_mananciais>")
     exit(1)
 end
 
@@ -18,6 +18,7 @@ input_file = ARGS[1]
 output_alocacao_file = ARGS[2]
 output_custo_file = ARGS[3]
 rotas_file = ARGS[4] # Caminho dinâmico das rotas
+NUM_MANANCIAIS_TESTE = parse(Int, ARGS[5])
 
 # Leitura dinâmica da entrada
 abastecimento = CSV.read(input_file, DataFrame, header=true)
@@ -38,16 +39,17 @@ function retornaDados()
     NB_TOTAL_ROTAS = 3315
     NB = NUM_BENEFICIARIOS
     Ajk = Matrix{Float64}(abastecimento[1:NB, 2:end])
-    NM = 92
+    NM_TOTAL = 92
+    NM = NUM_MANANCIAIS_TESTE
     
     # O arquivo de rotas contém 3315 beneficiários para cada um dos 92 mananciais.
     # Ele está ordenado por Manancial (0..91) e depois por Beneficiário (0..3314).
     # Portanto, reshape(..., (3315, 92)) cria uma matriz onde cada coluna é um manancial.
     # Transpomos para ter Dij[manancial, beneficiario].
     distancias_vetor = tres_colunas_r[3]
-    Dij_completa = transpose(reshape(distancias_vetor, (NB_TOTAL_ROTAS, 92)))
+    Dij_completa = transpose(reshape(distancias_vetor, (NB_TOTAL_ROTAS, NM_TOTAL)))
     
-    # Filtramos para os NB beneficiários presentes no arquivo de abastecimento
+    # Filtramos para os NM mananciais e NB beneficiários presentes no arquivo de abastecimento
     Dij = Dij_completa[1:NM, 1:NB]
     
     ND = 1:NUM_DIAS

@@ -7,9 +7,9 @@ using Gurobi
 # ==========================================
 # 1. LEITURA DOS ARGUMENTOS VIA TERMINAL
 # ==========================================
-if length(ARGS) < 4
+if length(ARGS) < 5
     println("ERRO: Faltam argumentos para o M2.")
-    println("Uso: julia m2args.jl <ABASTECIMENTO_CSV> <OUTPUT_ALOCACAO_CSV> <OUTPUT_CUSTO_CSV> <ROTAS_CSV>")
+    println("Uso: julia m2args.jl <ABASTECIMENTO_CSV> <OUTPUT_ALOCACAO_CSV> <OUTPUT_CUSTO_CSV> <ROTAS_CSV> <NUM_MANANCIAIS>")
     exit(1)
 end
 
@@ -17,6 +17,7 @@ ABASTECIMENTO_FILE = ARGS[1]
 OUTPUT_ALOCACAO = ARGS[2]
 OUTPUT_CUSTO = ARGS[3]
 ROTAS_FILE = ARGS[4]
+NUM_MANANCIAIS_TESTE = parse(Int, ARGS[5])
 
 # ==========================================
 # 2. LEITURA E PREPARAÇÃO DOS DADOS
@@ -25,13 +26,14 @@ abastecimento = CSV.read(ABASTECIMENTO_FILE, DataFrame, header=true)
 rotas = CSV.read(ROTAS_FILE, DataFrame)
 
 NUM_DIAS = size(abastecimento, 2) - 1
-NUM_MANANCIAIS = 92 # Fixo do seu projeto base
+NUM_MANANCIAIS_TOTAL = 92 # Total no arquivo de rotas
+NUM_MANANCIAIS = NUM_MANANCIAIS_TESTE # Limitado para o teste
 NUM_BENEFICIARIOS = size(abastecimento, 1)
 NB_TOTAL_ROTAS = 3315
 CAPACIDADE_MAX_MANANCIAL = 12
 
 distancias = rotas.distance_w_factor
-Dij_completa = transpose(reshape(distancias, (NB_TOTAL_ROTAS, NUM_MANANCIAIS)))
+Dij_completa = transpose(reshape(distancias, (NB_TOTAL_ROTAS, NUM_MANANCIAIS_TOTAL)))
 Dij = Dij_completa[1:NUM_MANANCIAIS, 1:NUM_BENEFICIARIOS]
 Ajk = Matrix{Float64}(abastecimento[:, 2:end])
 

@@ -6,9 +6,10 @@ import subprocess
 # ==========================================
 # 1. DEFINIÇÃO DE CAMINHOS BASE (Dinâmico)
 # ==========================================
+NUM_MANANCIAIS = 45 # Limite de mananciais a serem usados
 PASTA_BASE = Path(__file__).parent.resolve()
 PASTA_ENTRADAS = PASTA_BASE / "entradas_1500"
-PASTA_SAIDAS = PASTA_BASE / "saidas_1500"
+PASTA_SAIDAS = PASTA_BASE / f"saidas_1500_{NUM_MANANCIAIS}"
 
 ARQUIVO_ROTAS = PASTA_BASE / "Dados" / "rotas"
 
@@ -59,7 +60,8 @@ def executar_automacao():
                 str(caminho_arquivo.resolve()),
                 str(caminho_aloc_m1.resolve()),
                 str(caminho_custo_m1.resolve()),
-                str(ARQUIVO_ROTAS.resolve())
+                str(ARQUIVO_ROTAS.resolve()),
+                str(NUM_MANANCIAIS)
             ]
 
             cmd_m2 = [
@@ -67,7 +69,8 @@ def executar_automacao():
                 str(caminho_arquivo.resolve()),
                 str(caminho_aloc_m2.resolve()),
                 str(caminho_custo_m2.resolve()),
-                str(ARQUIVO_ROTAS.resolve())
+                str(ARQUIVO_ROTAS.resolve()),
+                str(NUM_MANANCIAIS)
             ]
 
             cmd_heu = [
@@ -75,7 +78,8 @@ def executar_automacao():
                 str(caminho_arquivo.resolve()),
                 str(caminho_aloc_heu.resolve()),
                 str(caminho_custo_heu.resolve()),
-                str(ARQUIVO_ROTAS.resolve())
+                str(ARQUIVO_ROTAS.resolve()),
+                str(NUM_MANANCIAIS)
             ]
 
             print("  -> Rodando Modelo Exato Diário (M1)...")
