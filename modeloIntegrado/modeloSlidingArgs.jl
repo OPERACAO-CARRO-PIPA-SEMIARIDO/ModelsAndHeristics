@@ -19,7 +19,8 @@ function rodar_sliding_window(
     num_dias_periodo::Int;
     caminho_volumes_iniciais=nothing,
     pasta_anterior=nothing,
-    overlap_dias=0
+    overlap_dias=0,
+    num_candidatos=1
 )
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
@@ -51,7 +52,7 @@ function rodar_sliding_window(
     TOTAL_BENEFICIARIOS = 3315
     TOTAL_MANANCIAIS = 92
     
-    # NUM_CANDIDATOS agora é passado como argumento ou padrão para 1
+    # NUM_CANDIDATOS agora é usado da assinatura da função
     CANDIDATOS_REAIS = min(num_candidatos, TOTAL_MANANCIAIS)
 
     dia_fim = dia_inicio + num_dias_periodo - 1
@@ -169,18 +170,6 @@ function rodar_sliding_window(
             end
 
             # x para os dias de sobreposição
-            # Se P1 era 1-45 e P2 é 39-83, overlap é 7 dias (39-45).
-            # No CSV de P1, esses são os dias 39, 40, ..., 45 (colunas "39", "40", ...).
-            # No modelo de P2, esses são os dias locais 1, 2, ..., 7.
-            
-            # Precisamos mapear os dias globais para as colunas do CSV anterior
-            # O CSV anterior tem colunas que são os dias locais daquele período.
-            # Se o período anterior começou no dia_anterior_inicio, o dia global G é a coluna (G - dia_anterior_inicio + 1).
-            
-            # Para simplificar, vamos assumir que as colunas do CSV são nomeadas de acordo com o dia LOCAL.
-            # Então se overlap_dias = 7 e o período anterior tinha 45 dias, 
-            # os últimos 7 dias são 39, 40, 41, 42, 43, 44, 45.
-            
             num_dias_anterior = size(df_abast, 2) - 1
             for od in 1:overlap_dias
                 col_idx = num_dias_anterior - overlap_dias + od
@@ -237,8 +226,6 @@ function rodar_sliding_window(
             break
         elseif status_parcial == MOI.INFEASIBLE
             println(">>> MODELO INFACTÍVEL!")
-            # Tenta encontrar o conflito se possível (apenas para debug)
-            # compute_conflict!(model)
             break
         end
     end
@@ -293,7 +280,6 @@ end
 
 function salvar_volumes_finais_sliding(model, pasta, sufixo, nb, nd_local)
     val_V = value.(model[:V])
-    # Salva apenas o último dia para compatibilidade com o rolling antigo se necessário
     ultimo_dia = last(nd_local)
     df_finais = DataFrame(Beneficiario = Int[], Volume = Float64[])
     for j in nb
@@ -301,7 +287,6 @@ function salvar_volumes_finais_sliding(model, pasta, sufixo, nb, nd_local)
     end
     CSV.write(joinpath(pasta, "$sufixo.csv"), df_finais)
 
-    # Salva todos os dias para o sliding window poder pegar o volume de qualquer dia de overlap
     colunas_volumes = Any[[j for j in nb]]
     for k in [0; collect(nd_local)]
         push!(colunas_volumes, [val_V[j, k] for j in nb])
