@@ -50,7 +50,9 @@ function rodar_sliding_window(
 
     TOTAL_BENEFICIARIOS = 3315
     TOTAL_MANANCIAIS = 92
-    NUM_CANDIDATOS = 1
+    
+    # NUM_CANDIDATOS agora é passado como argumento ou padrão para 1
+    CANDIDATOS_REAIS = min(num_candidatos, TOTAL_MANANCIAIS)
 
     dia_fim = dia_inicio + num_dias_periodo - 1
     nd_global = dia_inicio:dia_fim
@@ -80,7 +82,6 @@ function rodar_sliding_window(
     Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS_ARQUIVO, size(beneficiarios_ativos, 1)))
     Dij = Dij_completa[nm, nb]
 
-    CANDIDATOS_REAIS = min(NUM_CANDIDATOS, TOTAL_MANANCIAIS)
     candidatos_por_beneficiario = Dict{Int, Vector{Int}}()
     for j in nb
         fontes_ordenadas = sortperm(Dij[:, j])
@@ -318,6 +319,7 @@ if length(ARGS) >= 4
     vol_init = length(ARGS) >= 5 ? (ARGS[5] == "nothing" ? nothing : ARGS[5]) : nothing
     pasta_ant = length(ARGS) >= 6 ? (ARGS[6] == "nothing" ? nothing : ARGS[6]) : nothing
     overlap = length(ARGS) >= 7 ? parse(Int, ARGS[7]) : 0
+    k_candidatos = length(ARGS) >= 8 ? parse(Int, ARGS[8]) : 1
     
-    rodar_sliding_window(p, pasta, dia_ini, num_d, caminho_volumes_iniciais=vol_init, pasta_anterior=pasta_ant, overlap_dias=overlap)
+    rodar_sliding_window(p, pasta, dia_ini, num_d, caminho_volumes_iniciais=vol_init, pasta_anterior=pasta_ant, overlap_dias=overlap, num_candidatos=k_candidatos)
 end
