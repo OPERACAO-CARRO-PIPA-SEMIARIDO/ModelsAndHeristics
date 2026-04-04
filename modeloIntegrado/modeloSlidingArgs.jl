@@ -191,7 +191,7 @@ function rodar_sliding_window(
     end
 
     # Solução
-    horas_checkpoints = 3:3:3
+    horas_checkpoints = 2:2:6
     melhor_obj_encontrado = Inf
     tempo_inicio_global = time()
 
