@@ -44,7 +44,7 @@ quebra3 = [j for (j, x) in zip(nb, Y) if x < 4]
 quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
 distancias = rotas.distance_w_factor
-Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS_ARQUIVO, TOTAL_BENEFICIARIOS_ARQUIVO))
+Dij_completa = transpose(reshape(distancias, (TOTAL_BENEFICIARIOS_ARQUIVO, TOTAL_MANANCIAIS_ARQUIVO)))
 Dij = Dij_completa[nm, nb]
 
 CANDIDATOS_REAIS = min(NUM_CANDIDATOS, TOTAL_MANANCIAIS)
@@ -69,7 +69,7 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
     @variable(model, 0 <= y_pico, Int)
-    @variable(model, 0 <= V[j in nb, k in nd])
+    @variable(model, 0 <= V[j in nb, k in 0:last(nd)])
 
     @expression(model, expr_pico, qtd_dias_uteis * y_pico)
     @expression(model, expr_custo, sum(Dij[i,j] * x[j, i, k] for j in nb, i in candidatos_por_beneficiario[j], k in nd))
@@ -77,9 +77,9 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
 
     @objective(model, Min, (p * expr_pico) + ((1 - p) * expr_custo))
 
-    @constraint(model, balancoVolumeInicial[j in nb], V[j, 1] == C[j])
+    @constraint(model, balancoVolumeInicial[j in nb], V[j, 0] == C[j])
     
-    @constraint(model, balancoVolume[j in nb, k in 2:last(nd); !(calendarioCarnaval[k] == -1 && j in quebra4) && !(entregasObrigatorias[k] == -1 && j in quebra2)],
+    @constraint(model, balancoVolume[j in nb, k in 1:last(nd); !(calendarioCarnaval[k] == -1 && j in quebra4) && !(entregasObrigatorias[k] == -1 && j in quebra2)],
         V[j, k] <= V[j, k-1] - U[j] + 13.0 * sum(x[j, i, k] for i in candidatos_por_beneficiario[j]))
     
     @constraint(model, correcaoVolume[j in nb, k in nd; (calendarioCarnaval[k] == -1 && j in quebra4) || (entregasObrigatorias[k] == -1 && j in quebra2)],
@@ -89,9 +89,9 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     
     @constraint(model, restMaiorPico[k in nd], sum(x[j, i, k] for j in nb, i in candidatos_por_beneficiario[j]) <= y_pico)
     
-    @constraint(model, volumeMinimo[j in nb, k in nd], V[j, k] >= 0)
+    @constraint(model, volumeMinimo[j in nb, k in 0:last(nd)], V[j, k] >= 0)
     
-    @constraint(model, capacidadeMax[j in nb, k in nd], V[j, k] <= C[j])
+    @constraint(model, capacidadeMax[j in nb, k in 0:last(nd)], V[j, k] <= C[j])
     
     @constraint(model, carnavalAbastecimento[j in quebra4, k in nd; calendarioCarnaval[k] == 1], sum(x[j, i, k] for i in candidatos_por_beneficiario[j]) >= 1)
     

@@ -87,7 +87,7 @@ def analisar_calendario(abast_path, aloc_path=None, rotas_path=None):
 
 def atualizar_backup(nome_instancia, metricas, backup_path):
     try:
-        df_backup = pd.read_csv(backup_path, sep=';', decimal=',')
+        df_backup = pd.read_csv(backup_path, sep=';', decimal='.')
         
         if nome_instancia in df_backup['Nome da Instância'].values:
             idx = df_backup[df_backup['Nome da Instância'] == nome_instancia].index[0]
@@ -109,7 +109,7 @@ def atualizar_backup(nome_instancia, metricas, backup_path):
         df_backup.at[idx, 'Custo Projetado (365d)'] = metricas['custo_365']
         df_backup.at[idx, 'Status'] = "Sucesso (Sliding)"
         
-        df_backup.to_csv(backup_path, index=False, sep=';', decimal=',')
+        df_backup.to_csv(backup_path, index=False, sep=';', decimal='.')
         print(f"Backup atualizado para {nome_instancia}.")
     except Exception as e:
         print(f"Erro ao atualizar backup: {e}")
@@ -119,7 +119,15 @@ def main():
     rotas = base_dir / "alocacao/Dados/rotas"
     backup = base_dir / "alocacao/saidas_2/backup_temporario.csv"
     
-    for sliding_config in ["resultados_sliding_45_14", "resultados_sliding_90_14"]:
+    sliding_configs = [
+        "resultados_sliding_45_14", 
+        "resultados_sliding_90_14",
+        "sliding_60_14_3",
+        "sliding_90_14_3",
+        "sliding_120_14_3"
+    ]
+    
+    for sliding_config in sliding_configs:
         print(f"\n>>> Analisando: {sliding_config}")
         s_dir = base_dir / "modeloIntegrado" / sliding_config
         aba_g = s_dir / "abastecimento_GLOBAL.csv"

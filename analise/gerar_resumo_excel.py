@@ -5,7 +5,7 @@ def gerar_excel_formatado(csv_path, excel_path):
     print(f"Lendo CSV: {csv_path}")
     try:
         # Lê o CSV usando os mesmos parâmetros do tester.py original (; e ,)
-        df_resultados = pd.read_csv(csv_path, sep=';', decimal=',')
+        df_resultados = pd.read_csv(csv_path, sep=';', decimal='.')
         
         print(f"Gerando Excel: {excel_path}")
         with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:

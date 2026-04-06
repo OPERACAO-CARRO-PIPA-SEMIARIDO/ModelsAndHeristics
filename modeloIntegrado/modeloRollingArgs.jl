@@ -31,6 +31,7 @@ function rodar_rolling_horizon(
 
     TOTAL_BENEFICIARIOS = 3315
     TOTAL_MANANCIAIS = 92
+    TOTAL_MANANCIAIS_ARQUIVO = 92
     NUM_CANDIDATOS = 1
 
     dia_fim = dia_inicio + num_dias_periodo - 1
@@ -58,7 +59,7 @@ function rodar_rolling_horizon(
     quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
     distancias = rotas.distance_w_factor
-    Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS_ARQUIVO, size(beneficiarios_ativos, 1)))
+    Dij_completa = transpose(reshape(distancias, (TOTAL_BENEFICIARIOS, TOTAL_MANANCIAIS_ARQUIVO)))
     Dij = Dij_completa[nm, nb]
 
     CANDIDATOS_REAIS = min(NUM_CANDIDATOS, TOTAL_MANANCIAIS)
@@ -82,7 +83,7 @@ function rodar_rolling_horizon(
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd_local], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
     @variable(model, 0 <= y_pico, Int)
-    @variable(model, 0 <= V[j in nb, k in nd_local])
+    @variable(model, 0 <= V[j in nb, k in 0:num_dias_periodo])
 
     @expression(model, expr_pico, qtd_dias_uteis * y_pico)
     @expression(model, expr_custo, sum(Dij[i,j] * x[j, i, k] for j in nb, i in candidatos_por_beneficiario[j], k in nd_local))
@@ -90,16 +91,16 @@ function rodar_rolling_horizon(
     @objective(model, Min, (p * expr_pico) + ((1 - p) * expr_custo))
 
     if isnothing(caminho_volumes_iniciais) || !isfile(caminho_volumes_iniciais)
-        println(">>> Iniciando com volumes máximos (Capacidade)")
-        @constraint(model, balancoVolumeInicial[j in nb], V[j, 1] == C[j])
+        println(">>> Iniciando com volumes máximos (Capacidade) em k=0")
+        @constraint(model, balancoVolumeInicial[j in nb], V[j, 0] == C[j])
     else
-        println(">>> Carregando volumes iniciais de: $caminho_volumes_iniciais")
+        println(">>> Carregando volumes iniciais de: $caminho_volumes_iniciais em k=0")
         df_vol_init = CSV.read(caminho_volumes_iniciais, DataFrame)
         vol_dict = Dict(row[1] => row[2] for row in eachrow(df_vol_init))
-        @constraint(model, balancoVolumeInicial[j in nb], V[j, 1] == get(vol_dict, j, C[j]))
+        @constraint(model, balancoVolumeInicial[j in nb], V[j, 0] == get(vol_dict, j, C[j]))
     end
     
-    @constraint(model, balancoVolume[j in nb, k in 2:num_dias_periodo; !(calendarioCarnaval[k] == -1 && j in quebra4) && !(entregasObrigatorias[k] == -1 && j in quebra2)],
+    @constraint(model, balancoVolume[j in nb, k in 1:num_dias_periodo; !(calendarioCarnaval[k] == -1 && j in quebra4) && !(entregasObrigatorias[k] == -1 && j in quebra2)],
         V[j, k] <= V[j, k-1] - U[j] + 13.0 * sum(x[j, i, k] for i in candidatos_por_beneficiario[j]))
     
     @constraint(model, correcaoVolume[j in nb, k in nd_local; (calendarioCarnaval[k] == -1 && j in quebra4) || (entregasObrigatorias[k] == -1 && j in quebra2)],
@@ -109,9 +110,9 @@ function rodar_rolling_horizon(
     
     @constraint(model, restMaiorPico[k in nd_local], sum(x[j, i, k] for j in nb, i in candidatos_por_beneficiario[j]) <= y_pico)
     
-    @constraint(model, volumeMinimo[j in nb, k in nd_local], V[j, k] >= 0)
+    @constraint(model, volumeMinimo[j in nb, k in 0:num_dias_periodo], V[j, k] >= 0)
     
-    @constraint(model, capacidadeMax[j in nb, k in nd_local], V[j, k] <= C[j])
+    @constraint(model, capacidadeMax[j in nb, k in 0:num_dias_periodo], V[j, k] <= C[j])
     
     @constraint(model, carnavalAbastecimento[j in quebra4, k in nd_local; calendarioCarnaval[k] == 1], sum(x[j, i, k] for i in candidatos_por_beneficiario[j]) >= 1)
     

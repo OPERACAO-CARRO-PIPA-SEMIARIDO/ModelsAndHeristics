@@ -1,6 +1,8 @@
 import os
 import subprocess
 import pandas as pd
+import numpy as np
+import argparse
 from pathlib import Path
 
 # Configurações Fixas conforme solicitado
@@ -11,103 +13,26 @@ OVERLAP = 14
 PESO_PICO = 0.0
 K_CANDIDATOS = 3
 
-
-def executar_sliding_window():
-    path_base = Path(__file__).parent.resolve()
-    script_path = path_base / JULIA_SCRIPT
-
-    # Nomeação automática: sliding_ndiasjanela_ndiascompartilhados_quantosmananciais
-    output_base_name = f"sliding_{WINDOW_SIZE}_{OVERLAP}_{K_CANDIDATOS}"
-    output_dir = path_base / output_base_name
-    output_dir.mkdir(exist_ok=True)
-
-    volumes_iniciais_path = "nothing"
-    pasta_anterior = "nothing"
-
-    dia_inicio = 1
-    periodo_count = 1
-
-    while dia_inicio <= TOTAL_DIAS:
-        num_dias = min(WINDOW_SIZE, TOTAL_DIAS - dia_inicio + 1)
-
-        pasta_periodo = output_dir / \
-            f"periodo_{periodo_count}_dia_{dia_inicio}"
-        pasta_periodo.mkdir(exist_ok=True)
-
-        print(
-            f"\n>>> Executando Período {periodo_count}: Dias {dia_inicio} a {dia_inicio + num_dias - 1}")
-
-        # Chamada do Julia com argumentos posicionais:
-        # 1: Peso Pico, 2: Pasta, 3: Dia Inicio, 4: Num Dias,
-        # 5: Vol Init File, 6: Pasta Anterior, 7: Overlap Dias, 8: K Candidatos
-        cmd = [
-            "julia", str(script_path),
-            str(PESO_PICO),
-            str(pasta_periodo),
-            str(dia_inicio),
-            str(num_dias),
-            str(volumes_iniciais_path),
-            str(pasta_anterior),
-            str(OVERLAP if periodo_count > 1 else 0),
-            str(K_CANDIDATOS)
-        ]
-
-        try:
-            subprocess.run(cmd, check=True, shell=(os.name == 'nt'))
-
-            volumes_todos = pasta_periodo / "volumes_todos_dias.csv"
-            if not volumes_todos.exists():
-                print(
-                    f"    ERRO: O modelo não gerou volumes_todos_dias.csv na pasta {pasta_periodo}.")
-                break
-
-            if dia_inicio + num_dias - 1 >= TOTAL_DIAS:
-                print(">>> Horizonte total de 365 dias atingido.")
-                break
-
-            proximo_dia_inicio = dia_inicio + (WINDOW_SIZE - OVERLAP)
-
-            dia_global_ref = proximo_dia_inicio - 1
-            dia_local_ref = dia_global_ref - dia_inicio + 1
-
-            df_vol = pd.read_csv(volumes_todos)
-            col_name = str(dia_local_ref)
-
-            if col_name in df_vol.columns:
-                next_vol_init = pasta_periodo / \
-                    f"volumes_para_dia_{proximo_dia_inicio}.csv"
-                df_next = df_vol[["Beneficiarios", col_name]].copy()
-                df_next.columns = ["Beneficiario", "Volume"]
-                df_next.to_csv(next_vol_init, index=False)
-                volumes_iniciais_path = next_vol_init
-            else:
-                volumes_iniciais_path = pasta_periodo / "volumes_finais.csv"
-
-            pasta_anterior = pasta_periodo
-            dia_inicio = proximo_dia_inicio
-            periodo_count += 1
-
-        except subprocess.CalledProcessError as e:
-            print(
-                f"    ERRO ao executar Julia no período {periodo_count}: {e}")
-            break
-
-    print(f"\n>>> Processo finalizado com {periodo_count} períodos.")
-    consolidar_resultados(output_dir, periodo_count)
-    gerar_controle(output_dir, K_CANDIDATOS)
-
-
 def consolidar_resultados(output_dir, num_periodos):
-    print("\n>>> Consolidando resultados globais...")
+    print(f"\n>>> Consolidando resultados globais em {output_dir}...")
     df_abast_global = None
     df_aloc_global = None
 
-    for p in range(1, num_periodos + 1):
+    # Tenta descobrir o número de períodos se não for passado
+    if num_periodos is None:
+        periodos = list(output_dir.glob("periodo_*_dia_*"))
+        num_periodos = len(periodos)
+        print(f"    Detectados {num_periodos} períodos.")
+
+    for p in range(1, num_periodos + 2): # +2 para garantir que pegamos todos se houver falhas de numeração
         pastas = list(output_dir.glob(f"periodo_{p}_dia_*"))
         if not pastas:
             continue
         pasta = pastas[0]
-        dia_ini_global = int(pasta.name.split("_")[-1])
+        try:
+            dia_ini_global = int(pasta.name.split("_")[-1])
+        except:
+            continue
 
         file_abast = pasta / "abastecimento_melhor_absoluto.csv"
         file_aloc = pasta / "alocacao_melhor_absoluto.csv"
@@ -122,13 +47,18 @@ def consolidar_resultados(output_dir, num_periodos):
             df_abast_global = df_a[["Beneficiarios"]].copy()
             df_aloc_global = df_l[["Beneficiarios"]].copy()
 
-        for col in df_a.columns:
-            if col == "Beneficiarios":
-                continue
+        # Ordena as colunas locais (dias) para garantir processamento sequencial se necessário,
+        # embora a lógica de "primeira vez" funcione independente da ordem se os períodos forem processados em ordem.
+        cols_locais = sorted([c for c in df_a.columns if c.isdigit()], key=int)
+
+        for col in cols_locais:
             dia_local = int(col)
             dia_global = dia_ini_global + dia_local - 1
-            df_abast_global[str(dia_global)] = df_a[col]
-            df_aloc_global[str(dia_global)] = df_l[col]
+            col_global = str(dia_global)
+            
+            # SOBRESCREVE SEMPRE: O período mais recente (subsequente) prevalece no overlap
+            df_abast_global[col_global] = df_a[col]
+            df_aloc_global[col_global] = df_l[col]
 
     if df_abast_global is not None:
         cols = ["Beneficiarios"] + \
@@ -139,12 +69,11 @@ def consolidar_resultados(output_dir, num_periodos):
         df_abast_global.to_csv(
             output_dir / "abastecimento_GLOBAL.csv", index=False)
         df_aloc_global.to_csv(output_dir / "alocacao_GLOBAL.csv", index=False)
+        print(f"    Arquivos GLOBAL salvos em {output_dir}")
 
-
-def gerar_controle(output_dir, k_candidatos):
-    print("\n>>> Gerando planilha de controle...")
+def gerar_controle(output_dir, k_candidatos=3):
+    print(f"\n>>> Gerando planilha de controle em {output_dir}...")
     try:
-        import numpy as np
         path_raiz = Path(__file__).parent.parent.resolve()
 
         try:
@@ -195,6 +124,88 @@ def gerar_controle(output_dir, k_candidatos):
     except Exception as e:
         print(f"Erro ao gerar controle: {e}")
 
+def executar_sliding_window():
+    path_base = Path(__file__).parent.resolve()
+    script_path = path_base / JULIA_SCRIPT
+
+    # Nomeação automática
+    output_base_name = f"sliding_{WINDOW_SIZE}_{OVERLAP}_{K_CANDIDATOS}"
+    output_dir = path_base / output_base_name
+    output_dir.mkdir(exist_ok=True)
+
+    volumes_iniciais_path = "nothing"
+    pasta_anterior = "nothing"
+
+    dia_inicio = 1
+    periodo_count = 1
+
+    while dia_inicio <= TOTAL_DIAS:
+        num_dias = min(WINDOW_SIZE, TOTAL_DIAS - dia_inicio + 1)
+        pasta_periodo = output_dir / f"periodo_{periodo_count}_dia_{dia_inicio}"
+        pasta_periodo.mkdir(exist_ok=True)
+
+        print(f"\n>>> Executando Período {periodo_count}: Dias {dia_inicio} a {dia_inicio + num_dias - 1}")
+
+        cmd = [
+            "julia", str(script_path),
+            str(PESO_PICO),
+            str(pasta_periodo),
+            str(dia_inicio),
+            str(num_dias),
+            str(volumes_iniciais_path),
+            str(pasta_anterior),
+            str(OVERLAP if periodo_count > 1 else 0),
+            str(K_CANDIDATOS)
+        ]
+
+        try:
+            subprocess.run(cmd, check=True, shell=(os.name == 'nt'))
+            volumes_todos = pasta_periodo / "volumes_todos_dias.csv"
+            if not volumes_todos.exists():
+                print(f"    ERRO: O modelo não gerou volumes_todos_dias.csv.")
+                break
+
+            if dia_inicio + num_dias - 1 >= TOTAL_DIAS:
+                break
+
+            proximo_dia_inicio = dia_inicio + (WINDOW_SIZE - OVERLAP)
+            dia_global_ref = proximo_dia_inicio - 1
+            dia_local_ref = dia_global_ref - dia_inicio + 1
+
+            df_vol = pd.read_csv(volumes_todos)
+            col_name = str(dia_local_ref)
+
+            if col_name in df_vol.columns:
+                next_vol_init = pasta_periodo / f"volumes_para_dia_{proximo_dia_inicio}.csv"
+                df_next = df_vol[["Beneficiarios", col_name]].copy()
+                df_next.columns = ["Beneficiario", "Volume"]
+                df_next.to_csv(next_vol_init, index=False)
+                volumes_iniciais_path = next_vol_init
+            else:
+                volumes_iniciais_path = pasta_periodo / "volumes_finais.csv"
+
+            pasta_anterior = pasta_periodo
+            dia_inicio = proximo_dia_inicio
+            periodo_count += 1
+        except subprocess.CalledProcessError as e:
+            print(f"    ERRO ao executar Julia: {e}")
+            break
+
+    consolidar_resultados(output_dir, periodo_count)
+    gerar_controle(output_dir, K_CANDIDATOS)
 
 if __name__ == "__main__":
-    executar_sliding_window()
+    parser = argparse.ArgumentParser(description="Sliding Window Model Script")
+    parser.add_argument("--consolidar", type=str, help="Caminho da pasta para consolidar resultados (pula otimização)")
+    
+    args = parser.parse_args()
+    
+    if args.consolidar:
+        caminho = Path(args.consolidar).resolve()
+        if caminho.exists():
+            consolidar_resultados(caminho, None)
+            gerar_controle(caminho)
+        else:
+            print(f"Erro: Caminho {caminho} não encontrado.")
+    else:
+        executar_sliding_window()

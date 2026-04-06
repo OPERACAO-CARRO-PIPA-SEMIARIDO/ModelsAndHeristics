@@ -80,7 +80,7 @@ function rodar_sliding_window(
     quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
     distancias = rotas.distance_w_factor
-    Dij_completa = reshape(distancias, (TOTAL_MANANCIAIS_ARQUIVO, size(beneficiarios_ativos, 1)))
+    Dij_completa = transpose(reshape(distancias, (TOTAL_BENEFICIARIOS, TOTAL_MANANCIAIS_ARQUIVO)))
     Dij = Dij_completa[nm, nb]
 
     candidatos_por_beneficiario = Dict{Int, Vector{Int}}()
@@ -154,15 +154,23 @@ function rodar_sliding_window(
             # Carrega x (abastecimento)
             df_abast = CSV.read(joinpath(pasta_anterior, "abastecimento_melhor_absoluto.csv"), DataFrame)
             
-            # z é constante, podemos pegar de qualquer coluna onde houve entrega ou apenas confiar na primeira se houver consistência
-            # No modelo Rolling/Sliding, z deve ser o mesmo para todo o período.
-            # Vamos assumir que a alocação do beneficiário j é a que está no arquivo.
+            # z é constante, podemos pegar de qualquer coluna onde houve entrega
             for j in nb
-                fonte_anterior = df_aloc[j, end] # Pega o último dia do período anterior
-                if fonte_anterior > 0 && fonte_anterior in candidatos_por_beneficiario[j]
-                    set_start_value(z[j, fonte_anterior], 1.0)
+                fonte_escolhida = 0
+                # Tenta encontrar a fonte em qualquer dia (coluna) do arquivo anterior
+                for col in names(df_aloc)
+                    if col == "Beneficiarios" continue end
+                    val_fonte = df_aloc[j, col]
+                    if val_fonte > 0
+                        fonte_escolhida = Int(val_fonte)
+                        break
+                    end
+                end
+
+                if fonte_escolhida > 0 && fonte_escolhida in candidatos_por_beneficiario[j]
+                    set_start_value(z[j, fonte_escolhida], 1.0)
                     for i in candidatos_por_beneficiario[j]
-                        if i != fonte_anterior
+                        if i != fonte_escolhida
                             set_start_value(z[j, i], 0.0)
                         end
                     end
