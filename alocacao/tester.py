@@ -8,8 +8,8 @@ import subprocess
 # ==========================================
 NUM_MANANCIAIS = 45  # Limite de mananciais a serem usados
 PASTA_BASE = Path(__file__).parent.resolve()
-PASTA_ENTRADAS = PASTA_BASE / "entradas_1500"
-PASTA_SAIDAS = PASTA_BASE / f"saidas_1500_{NUM_MANANCIAIS}"
+PASTA_ENTRADAS = PASTA_BASE / "entradas_1250"
+PASTA_SAIDAS = PASTA_BASE / f"saidas_1250_{NUM_MANANCIAIS}"
 
 ARQUIVO_ROTAS = PASTA_BASE / "Dados" / "rotas"
 
@@ -74,7 +74,7 @@ def executar_automacao():
             ]
 
             cmd_heu = [
-                "python", str(PASTA_BASE / "HeuristicaAlocacaoArgs.py"),
+                "python", str(PASTA_BASE / "heuristicaAlocacaoArgs.py"),
                 str(caminho_arquivo.resolve()),
                 str(caminho_aloc_heu.resolve()),
                 str(caminho_custo_heu.resolve()),
