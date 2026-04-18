@@ -23,8 +23,8 @@ CAPACIDADE_MAX_MANANCIAL = 12
 # ---> CONFIGURAÇÃO DE TESTE REDUZIDO <---
 TOTAL_BENEFICIARIOS = 3315
 TOTAL_MANANCIAIS = 92
-TOTAL_DIAS = 150
-NUM_CANDIDATOS = 5
+TOTAL_DIAS = 365
+NUM_CANDIDATOS = 3  
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
@@ -66,7 +66,8 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
     
     set_optimizer_attribute(model, "NodefileStart", 10.0) 
     set_optimizer_attribute(model, "MemLimit", 28.0)
-    set_optimizer_attribute(model, "MIPFocus", 1) # Prioritize finding feasible solutions
+    set_optimizer_attribute(model, "Threads", 1)
+    #set_optimizer_attribute(model, "MIPFocus", 1) # Prioritize finding feasible solutions
 
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
@@ -262,6 +263,6 @@ function salvar_saidas(model, pasta, sufixo)
 end
 
 # Exemplo de uso:
-alocacao_path = joinpath(pwd(), "alocacao", "saidas_150", "alocacao_abastecimento_00_150_2", "alocacao_m2.csv")
-abastecimento_path = joinpath(pwd(), "alocacao", "entradas_150", "abastecimento_00_150_2.csv")
+alocacao_path = joinpath(pwd(), "alocacao", "saidas_2", "alocacao_00", "alocacao_m2.csv")
+abastecimento_path = joinpath(pwd(), "alocacao", "entradas", "00.csv")
 rodar_modelo_integrado(0.00, "resultados00w_min00_m2", abastecimento_warm_start=abastecimento_path, alocacao_warm_start=alocacao_path)

@@ -21,10 +21,10 @@ TOTAL_MANANCIAIS_ARQUIVO = 92
 CAPACIDADE_MAX_MANANCIAL = 12
 
 # ---> CONFIGURAÇÃO DE TESTE REDUZIDO <---
-TOTAL_BENEFICIARIOS = 3315
-TOTAL_MANANCIAIS = 92
-TOTAL_DIAS = 60
-NUM_CANDIDATOS = 1
+TOTAL_BENEFICIARIOS = 1500
+TOTAL_MANANCIAIS = 45
+TOTAL_DIAS = 365
+NUM_CANDIDATOS = 3
 
 nb = 1:TOTAL_BENEFICIARIOS
 nd = 1:TOTAL_DIAS
@@ -64,7 +64,7 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String)
     
     set_optimizer_attribute(model, "NodefileStart", 10.0) 
     set_optimizer_attribute(model, "MemLimit", 28.0)
-    set_optimizer_attribute(model, "MIPFocus", 1) # Prioritize finding feasible solutions
+    set_optimizer_attribute(model, "Threads", 2)
 
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int) 
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin) 
@@ -212,4 +212,4 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-rodar_modelo_integrado(0.00, "resultados00_3315_60")
+rodar_modelo_integrado(0.00, "resultados00_1250_365")
