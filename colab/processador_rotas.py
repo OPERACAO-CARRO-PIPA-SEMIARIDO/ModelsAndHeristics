@@ -6,7 +6,7 @@ import time
 
 # --- Configurações de Caminhos ---
 # Ajustado para os caminhos reais encontrados no sistema
-BASE_PATH = "/home/guilherme/repos/backup/AlocacaoCarrosPipas/Dados"
+BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
 ARQUIVO_BENEFICIARIOS = os.path.join(BASE_PATH, "Beneficiarios_RN_Ativos1.csv")
 ARQUIVO_MANANCIAIS = os.path.join(BASE_PATH, "Mananciais_RN.csv")
 # O arquivo de saída costuma não ter extensão nos modelos Julia
