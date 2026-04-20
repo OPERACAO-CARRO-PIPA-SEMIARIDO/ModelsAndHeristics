@@ -6,7 +6,7 @@ import subprocess
 # ==========================================
 # 1. DEFINIÇÃO DE CAMINHOS BASE (Dinâmico)
 # ==========================================
-NUM_MANANCIAIS = 45  # Limite de mananciais a serem usados
+NUM_MANANCIAIS = 40  # Limite de mananciais a serem usados
 PASTA_BASE = Path(__file__).parent.resolve()
 PASTA_ENTRADAS = PASTA_BASE / "entradas_1250"
 PASTA_SAIDAS = PASTA_BASE / f"saidas_1250_{NUM_MANANCIAIS}"
