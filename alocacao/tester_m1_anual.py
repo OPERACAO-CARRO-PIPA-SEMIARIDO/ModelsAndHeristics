@@ -6,7 +6,7 @@ import subprocess
 # ==========================================
 # 1. DEFINIÇÃO DE CAMINHOS BASE (Dinâmico)
 # ==========================================
-NUM_MANANCIAIS = 40
+NUM_MANANCIAIS = 92
 PASTA_BASE = Path(__file__).parent.resolve()
 PASTA_ENTRADAS = PASTA_BASE / "entradas"
 PASTA_SAIDAS = PASTA_BASE / "saidas_m1_anual"
@@ -64,7 +64,8 @@ def executar_automacao():
 
         except subprocess.CalledProcessError as e:
             print(f"ERRO DE EXECUÇÃO na instância {nome_entrada}.")
-            print(f"Detalhes: {e.stderr}")
+            print(f"Detalhes stdout: {e.stdout}")
+            print(f"Detalhes stderr: {e.stderr}")
             custo, tempo = None, None
             status = "Erro Execução"
         except Exception as e:
