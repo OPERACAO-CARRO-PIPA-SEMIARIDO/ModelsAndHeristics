@@ -56,7 +56,7 @@ def executar_automacao():
         # 2. Execução dos Modelos e Heurística
         try:
             cmd_m1 = [
-                "julia", str(PASTA_BASE / "m1args.jl"),
+                "julia", str(PASTA_BASE / "m1_diario.jl"),
                 str(caminho_arquivo.resolve()),
                 str(caminho_aloc_m1.resolve()),
                 str(caminho_custo_m1.resolve()),
