@@ -7,11 +7,10 @@ import subprocess
 # 1. DEFINIÇÃO DE CAMINHOS BASE (Dinâmico)
 # ==========================================
 NUM_MANANCIAIS = 92
-PASTA_BASE = Path(__file__).parent.resolve()
-PASTA_ENTRADAS = PASTA_BASE / "entradas"
-PASTA_SAIDAS = PASTA_BASE / "saidas_3"
-
-ARQUIVO_ROTAS = PASTA_BASE / "Dados" / "rotas"
+PASTA_BASE     = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao")
+PASTA_ENTRADAS = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas")
+PASTA_SAIDAS   = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/saidas_3")
+ARQUIVO_ROTAS  = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/Dados/rotas")
 
 PASTA_SAIDAS.mkdir(parents=True, exist_ok=True)
 
