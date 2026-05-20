@@ -59,24 +59,26 @@ function resolve_M2(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
 
     @objective(linModel, Min, sum(matriz_dist[i,j] * x[i,j,k] for i in 1:NM, j in 1:NB, k in 1:ND if matriz_demanda[j,k] > 0))
 
-    tempo_inicio = time()
+    t0 = time()
     optimize!(linModel)
-    tempo_fim = time()
-    tempo_exec = tempo_fim - tempo_inicio
+    tempo_exec = time() - t0
 
-    if has_values(linModel)
-        return value.(y), objective_value(linModel), num_variables(linModel), tempo_exec, true
+    status = termination_status(linModel)
+
+    if status == MOI.OPTIMAL
+        return value.(y), objective_value(linModel), num_variables(linModel), tempo_exec, "Otimo"
+    elseif status == MOI.TIME_LIMIT && has_values(linModel)
+        println("AVISO: Limite de tempo atingido. Solução subótima retornada.")
+        return value.(y), objective_value(linModel), num_variables(linModel), tempo_exec, "SubOtimo_LimiteTempo"
     else
-        return zeros(Int, NM, NB), 0.0, num_variables(linModel), tempo_exec, false
+        println("ERRO: Nenhuma solução viável encontrada. Status: $(status)")
+        return nothing, 0.0, num_variables(linModel), tempo_exec, string(status)
     end
 end
 
-# ==========================================
-# 4. EXECUÇÃO E GERAÇÃO DAS SAÍDAS
-# ==========================================
-y_opt, custo_total, num_vars, tempo_exec, solucao_valida = resolve_M2(NUM_MANANCIAIS, NUM_BENEFICIARIOS, NUM_DIAS, Dij, Ajk, CAPACIDADE_MAX_MANANCIAL)
+y_opt, custo_total, num_vars, tempo_exec, status_str = resolve_M2(NUM_MANANCIAIS, NUM_BENEFICIARIOS, NUM_DIAS, Dij, Ajk, CAPACIDADE_MAX_MANANCIAL)
 
-if solucao_valida
+if y_opt !== nothing
     df_alocacao = copy(abastecimento)
 
     for j in 1:NUM_BENEFICIARIOS
@@ -87,7 +89,7 @@ if solucao_valida
                 break
             end
         end
-        
+
         for k in 1:NUM_DIAS
             if Ajk[j, k] > 0
                 df_alocacao[j, k + 1] = fonte_escolhida
@@ -98,15 +100,22 @@ if solucao_valida
     end
 
     df_metricas = DataFrame(
-        Tempo_de_Execucao = [tempo_exec], 
-        Solucao_otima = [custo_total], 
-        Num_Variaveis = [num_vars]
+        Tempo_de_Execucao = [tempo_exec],
+        Solucao_otima     = [custo_total],
+        Num_Variaveis     = [num_vars],
+        Status_Solucao    = [status_str]
     )
 
-    CSV.write(OUTPUT_CUSTO, df_metricas)
+    CSV.write(OUTPUT_CUSTO,    df_metricas)
     CSV.write(OUTPUT_ALOCACAO, df_alocacao)
 else
-    # Na automação, não gerar arquivo avisa o Python que algo deu errado
-    println("Falha ou timeout. Nenhuma solucao valida para exportar.")
+    df_metricas = DataFrame(
+        Tempo_de_Execucao = [tempo_exec],
+        Solucao_otima     = [0.0],
+        Num_Variaveis     = [num_vars],
+        Status_Solucao    = [status_str]
+    )
+    CSV.write(OUTPUT_CUSTO, df_metricas)
+    println("Nenhuma solução exportada.")
     exit(1)
 end

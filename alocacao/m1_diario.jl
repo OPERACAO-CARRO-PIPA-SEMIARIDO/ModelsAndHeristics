@@ -80,37 +80,51 @@ function resolvePL(dia, dados)
 
     optimize!(linModel)
 
-    # Extração da alocação para o formato de saída
+    status = termination_status(linModel)
+    if status != MOI.OPTIMAL
+        println("AVISO: dia $dia — status $(status). Dia pulado.")
+        return 0.0, num_variables(linModel), string(status)
+    end
+
     x_sol = value.(x)
     for j in 1:NB
         if Ajk[j, dia] > 0
+            # Grava o manancial com o maior número de viagens (correto para demanda > 1)
+            fonte_escolhida = 0
+            max_viagens     = 0.0
             for i in 1:NM
-                if x_sol[i,j] > 0.5
-                    df_alocacao[j, dia + 1] = i
-                    break
+                if x_sol[i, j] > max_viagens
+                    max_viagens     = x_sol[i, j]
+                    fonte_escolhida = i
                 end
             end
+            df_alocacao[j, dia + 1] = fonte_escolhida
         else
             df_alocacao[j, dia + 1] = 0
         end
     end
 
-    return objective_value(linModel), num_variables(linModel)
+    return objective_value(linModel), num_variables(linModel), "Otimo"
 end
 
 function roda_PL(ND_total::Int)
-    df_resultados_total = DataFrame(Tempo_de_Execucao = Float64[], Solucao_otima = Float64[], Num_Variaveis = Int[])
+    df_resultados = DataFrame(
+        Dia               = Int[],
+        Tempo_de_Execucao = Float64[],
+        Solucao_otima     = Float64[],
+        Num_Variaveis     = Int[],
+        Status_Solucao    = String[]
+    )
     dados = retornaDados()
-    
+
     for dia in 1:ND_total
-        tempo_inicio_dia = time()
-        custo, vars = resolvePL(dia, dados)
-        tempo_fim_dia = time()
-        
-        push!(df_resultados_total, (tempo_fim_dia - tempo_inicio_dia, custo, vars))
+        t0 = time()
+        custo, nvars, status = resolvePL(dia, dados)
+        t1 = time()
+        push!(df_resultados, (dia, t1 - t0, custo, nvars, status))
     end
-  
-    CSV.write(output_custo_file, df_resultados_total)
+
+    CSV.write(output_custo_file,    df_resultados)
     CSV.write(output_alocacao_file, df_alocacao)
 end
 

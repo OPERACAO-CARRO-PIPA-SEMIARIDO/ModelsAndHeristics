@@ -43,47 +43,57 @@ Ajk = Matrix{Float64}(abastecimento[:, 2:end])
 # Resolve o ano inteiro como um único ILP, mas sem fixar a fonte por beneficiário.
 # ==========================================
 function resolve_M1_anual(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
-    env = Gurobi.Env()
+    env      = Gurobi.Env()
     linModel = Model(() -> Gurobi.Optimizer(env))
     set_silent(linModel)
-
     set_time_limit_sec(linModel, 86400.0)
 
     @variable(linModel, 0 <= x[i=1:NM, j=1:NB, k=1:ND; matriz_demanda[j,k] > 0], Int)
 
-    @constraint(linModel, cap_diaria[i=1:NM, k=1:ND], sum(x[i,j,k] for j in 1:NB if matriz_demanda[j,k] > 0) <= cap_max)
-    @constraint(linModel, atende_dem[j=1:NB, k=1:ND; matriz_demanda[j,k] > 0], sum(x[i,j,k] for i in 1:NM) == matriz_demanda[j,k])
+    @constraint(linModel, cap[i=1:NM, k=1:ND],
+        sum(x[i,j,k] for j in 1:NB if matriz_demanda[j,k] > 0) <= cap_max)
 
-    @objective(linModel, Min, sum(matriz_dist[i,j] * x[i,j,k] for i in 1:NM, j in 1:NB, k in 1:ND if matriz_demanda[j,k] > 0))
+    @constraint(linModel, dem[j=1:NB, k=1:ND; matriz_demanda[j,k] > 0],
+        sum(x[i,j,k] for i in 1:NM) == matriz_demanda[j,k])
 
-    tempo_inicio = time()
+    @objective(linModel, Min,
+        sum(matriz_dist[i,j] * x[i,j,k]
+            for i in 1:NM, j in 1:NB, k in 1:ND if matriz_demanda[j,k] > 0))
+
+    t0 = time()
     optimize!(linModel)
-    tempo_fim = time()
-    tempo_exec = tempo_fim - tempo_inicio
+    tempo_exec = time() - t0
 
-    if has_values(linModel)
-        return value.(x), objective_value(linModel), num_variables(linModel), tempo_exec, true
+    status = termination_status(linModel)
+
+    if status == MOI.OPTIMAL
+        return value.(x), objective_value(linModel), num_variables(linModel), tempo_exec, "Otimo"
+    elseif status == MOI.TIME_LIMIT && has_values(linModel)
+        println("AVISO: Limite de tempo atingido. Solução subótima retornada.")
+        return value.(x), objective_value(linModel), num_variables(linModel), tempo_exec, "SubOtimo_LimiteTempo"
     else
-        return nothing, 0.0, num_variables(linModel), tempo_exec, false
+        println("ERRO: Nenhuma solução viável encontrada. Status: $(status)")
+        return nothing, 0.0, num_variables(linModel), tempo_exec, string(status)
     end
 end
 
-# ==========================================
-# 4. EXECUÇÃO E GERAÇÃO DAS SAÍDAS
-# ==========================================
-x_opt, custo_total, num_vars, tempo_exec, solucao_valida = resolve_M1_anual(NUM_MANANCIAIS, NUM_BENEFICIARIOS, NUM_DIAS, Dij, Ajk, CAPACIDADE_MAX_MANANCIAL)
+x_opt, custo_total, num_vars, tempo_exec, status_str =
+    resolve_M1_anual(NUM_MANANCIAIS, NUM_BENEFICIARIOS, NUM_DIAS, Dij, Ajk, CAPACIDADE_MAX_MANANCIAL)
 
-if solucao_valida
+if x_opt !== nothing
     df_alocacao = copy(abastecimento)
 
     for j in 1:NUM_BENEFICIARIOS
         for k in 1:NUM_DIAS
             if Ajk[j, k] > 0
+                # Grava o manancial com o maior número de viagens (correto para demanda > 1)
                 fonte_escolhida = 0
+                max_viagens     = 0.0
                 for i in 1:NUM_MANANCIAIS
-                    if x_opt[i,j,k] > 0.5
+                    val = x_opt[i, j, k]
+                    if val > max_viagens
+                        max_viagens     = val
                         fonte_escolhida = i
-                        break
                     end
                 end
                 df_alocacao[j, k + 1] = fonte_escolhida
@@ -95,13 +105,21 @@ if solucao_valida
 
     df_metricas = DataFrame(
         Tempo_de_Execucao = [tempo_exec],
-        Solucao_otima = [custo_total],
-        Num_Variaveis = [num_vars]
+        Solucao_otima     = [custo_total],
+        Num_Variaveis     = [num_vars],
+        Status_Solucao    = [status_str]
     )
 
-    CSV.write(OUTPUT_CUSTO, df_metricas)
+    CSV.write(OUTPUT_CUSTO,    df_metricas)
     CSV.write(OUTPUT_ALOCACAO, df_alocacao)
 else
-    println("Falha ou timeout. Nenhuma solucao valida para exportar.")
+    df_metricas = DataFrame(
+        Tempo_de_Execucao = [tempo_exec],
+        Solucao_otima     = [0.0],
+        Num_Variaveis     = [num_vars],
+        Status_Solucao    = [status_str]
+    )
+    CSV.write(OUTPUT_CUSTO, df_metricas)
+    println("Nenhuma solução exportada.")
     exit(1)
 end
