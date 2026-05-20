@@ -5,10 +5,10 @@ import subprocess
 
 NUM_MANANCIAIS = 92
 
-PASTA_BASE     = Path(__file__).parent.resolve()
-PASTA_ENTRADAS = PASTA_BASE.parent / "entradas"
-PASTA_SAIDAS   = PASTA_BASE / "saidas"
-ARQUIVO_ROTAS  = PASTA_BASE.parent / "Dados" / "rotas"
+PASTA_BASE     = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/modelos_m1_corrigidos")
+PASTA_ENTRADAS = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas")
+PASTA_SAIDAS   = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/modelos_m1_corrigidos/saidas")
+ARQUIVO_ROTAS  = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/Dados/rotas")
 
 PASTA_SAIDAS.mkdir(parents=True, exist_ok=True)
 
@@ -90,13 +90,13 @@ def executar_automacao():
         pasta.mkdir(parents=True, exist_ok=True)
 
         caminhos = {
-            "m1_diario": (pasta / "alocacao_m1_diario.csv", pasta / "custos_m1_diario.csv"),
-            "m1_anual":  (pasta / "alocacao_m1_anual.csv",  pasta / "custos_m1_anual.csv"),
-            "m2":        (pasta / "alocacao_m2.csv",         pasta / "custos_m2.csv"),
+            "m1_diario":   (pasta / "alocacao_m1_diario.csv",   pasta / "custos_m1_diario.csv"),
+            "m1_anual":    (pasta / "alocacao_m1_anual.csv",    pasta / "custos_m1_anual.csv"),
+            "m2":          (pasta / "alocacao_m2.csv",          pasta / "custos_m2.csv"),
+            "m2_compacto": (pasta / "alocacao_m2_compacto.csv", pasta / "custos_m2_compacto.csv"),
         }
 
         resultados = {}
-        status_geral_partes = []
 
         for modelo, (aloc, custo_csv) in caminhos.items():
             julia_script = PASTA_BASE / f"{modelo}.jl"
@@ -108,44 +108,51 @@ def executar_automacao():
                 str(ARQUIVO_ROTAS.resolve()),
                 str(NUM_MANANCIAIS),
             ]
-            label = {"m1_diario": "M1 Diário", "m1_anual": "M1 Anual", "m2": "M2"}[modelo]
+            label = {
+                "m1_diario":   "M1 Diário",
+                "m1_anual":    "M1 Anual",
+                "m2":          "M2",
+                "m2_compacto": "M2 Compacto",
+            }[modelo]
             print(f"  -> Rodando {label}...")
             try:
                 rodar_julia(cmd, modelo, nome)
                 custo, tempo, status_sol = ler_custo(custo_csv)
                 resultados[modelo] = {"custo": custo, "tempo": tempo, "status": status_sol}
-                status_geral_partes.append(f"{label}: {status_sol}")
             except subprocess.CalledProcessError as e:
                 print(f"     ERRO de execução em {label}: {e.stderr[:200]}")
                 resultados[modelo] = {"custo": None, "tempo": None, "status": "Erro Execução"}
-                status_geral_partes.append(f"{label}: Erro")
             except Exception as e:
                 print(f"     ERRO ao ler resultados de {label}: {e}")
                 resultados[modelo] = {"custo": None, "tempo": None, "status": "Erro Leitura"}
-                status_geral_partes.append(f"{label}: Erro")
 
         c_diario = resultados["m1_diario"]["custo"]
         c_anual  = resultados["m1_anual"]["custo"]
         c_m2     = resultados["m2"]["custo"]
+        c_m2c    = resultados["m2_compacto"]["custo"]
 
         dados_planilha.append({
-            "Nome da Instância":              nome,
-            "Total de Entregas":              total_entregas,
-            "Pico de Abastecimento (Max/Dia)": pico_abastecimento,
-            "Status M1 Diário":               resultados["m1_diario"]["status"],
-            "Status M1 Anual":                resultados["m1_anual"]["status"],
-            "Status M2":                      resultados["m2"]["status"],
-            "Custo M1 Diário":                c_diario,
-            "Custo M1 Anual":                 c_anual,
-            "Custo M2":                       c_m2,
-            "Gap M1 Anual vs M1 Diário (%)":  gap(c_anual, c_diario),
-            "Gap M2 vs M1 Diário (%)":        gap(c_m2,    c_diario),
-            "Gap M2 vs M1 Anual (%)":         gap(c_m2,    c_anual),
-            "Tempo M1 Diário (s)":            resultados["m1_diario"]["tempo"],
-            "Tempo M1 Anual (s)":             resultados["m1_anual"]["tempo"],
-            "Tempo M2 (s)":                   resultados["m2"]["tempo"],
-            "Caminho da Entrada":             str(caminho_arquivo.resolve()),
-            "Pasta de Saída":                 str(pasta.resolve()),
+            "Nome da Instância":                nome,
+            "Total de Entregas":                total_entregas,
+            "Pico de Abastecimento (Max/Dia)":  pico_abastecimento,
+            "Status M1 Diário":                 resultados["m1_diario"]["status"],
+            "Status M1 Anual":                  resultados["m1_anual"]["status"],
+            "Status M2":                        resultados["m2"]["status"],
+            "Status M2 Compacto":               resultados["m2_compacto"]["status"],
+            "Custo M1 Diário":                  c_diario,
+            "Custo M1 Anual":                   c_anual,
+            "Custo M2":                         c_m2,
+            "Custo M2 Compacto":                c_m2c,
+            "Gap M1 Anual vs M1 Diário (%)":    gap(c_anual, c_diario),
+            "Gap M2 vs M1 Diário (%)":          gap(c_m2,    c_diario),
+            "Gap M2 Compacto vs M1 Diário (%)": gap(c_m2c,   c_diario),
+            "Gap M2 Compacto vs M2 (%)":        gap(c_m2c,   c_m2),
+            "Tempo M1 Diário (s)":              resultados["m1_diario"]["tempo"],
+            "Tempo M1 Anual (s)":               resultados["m1_anual"]["tempo"],
+            "Tempo M2 (s)":                     resultados["m2"]["tempo"],
+            "Tempo M2 Compacto (s)":            resultados["m2_compacto"]["tempo"],
+            "Caminho da Entrada":               str(caminho_arquivo.resolve()),
+            "Pasta de Saída":                   str(pasta.resolve()),
         })
 
         pd.DataFrame(dados_planilha).to_csv(
