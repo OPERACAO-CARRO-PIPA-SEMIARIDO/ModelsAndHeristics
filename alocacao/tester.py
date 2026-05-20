@@ -6,10 +6,10 @@ import subprocess
 # ==========================================
 # 1. DEFINIÇÃO DE CAMINHOS BASE (Dinâmico)
 # ==========================================
-NUM_MANANCIAIS = 40  # Limite de mananciais a serem usados
+NUM_MANANCIAIS = 92
 PASTA_BASE = Path(__file__).parent.resolve()
-PASTA_ENTRADAS = PASTA_BASE / "entradas_1250"
-PASTA_SAIDAS = PASTA_BASE / f"saidas_1250_{NUM_MANANCIAIS}"
+PASTA_ENTRADAS = PASTA_BASE / "entradas"
+PASTA_SAIDAS = PASTA_BASE / "saidas_3"
 
 ARQUIVO_ROTAS = PASTA_BASE / "Dados" / "rotas"
 
@@ -44,8 +44,11 @@ def executar_automacao():
         pasta_alocacao = PASTA_SAIDAS / f"alocacao_{nome_entrada}"
         pasta_alocacao.mkdir(parents=True, exist_ok=True)
 
-        caminho_aloc_m1 = pasta_alocacao / "alocacao_m1.csv"
-        caminho_custo_m1 = pasta_alocacao / "custos_m1.csv"
+        caminho_aloc_m1d = pasta_alocacao / "alocacao_m1_diario.csv"
+        caminho_custo_m1d = pasta_alocacao / "custos_m1_diario.csv"
+
+        caminho_aloc_m1a = pasta_alocacao / "alocacao_m1_anual.csv"
+        caminho_custo_m1a = pasta_alocacao / "custos_m1_anual.csv"
 
         caminho_aloc_m2 = pasta_alocacao / "alocacao_m2.csv"
         caminho_custo_m2 = pasta_alocacao / "custos_m2.csv"
@@ -53,72 +56,54 @@ def executar_automacao():
         caminho_aloc_heu = pasta_alocacao / "alocacao_heu.csv"
         caminho_custo_heu = pasta_alocacao / "custos_heu.csv"
 
+        def _cmd_julia(script, aloc, custo):
+            return ["julia", str(PASTA_BASE / script),
+                    str(caminho_arquivo.resolve()), str(aloc.resolve()),
+                    str(custo.resolve()), str(ARQUIVO_ROTAS.resolve()), str(NUM_MANANCIAIS)]
+
         # 2. Execução dos Modelos e Heurística
         try:
-            cmd_m1 = [
-                "julia", str(PASTA_BASE / "m1_diario.jl"),
-                str(caminho_arquivo.resolve()),
-                str(caminho_aloc_m1.resolve()),
-                str(caminho_custo_m1.resolve()),
-                str(ARQUIVO_ROTAS.resolve()),
-                str(NUM_MANANCIAIS)
-            ]
+            print("  -> Rodando M1 Diário...")
+            subprocess.run(_cmd_julia("m1_diario.jl", caminho_aloc_m1d, caminho_custo_m1d),
+                           capture_output=True, text=True, check=True)
 
-            cmd_m2 = [
-                "julia", str(PASTA_BASE / "m2args.jl"),
-                str(caminho_arquivo.resolve()),
-                str(caminho_aloc_m2.resolve()),
-                str(caminho_custo_m2.resolve()),
-                str(ARQUIVO_ROTAS.resolve()),
-                str(NUM_MANANCIAIS)
-            ]
+            print("  -> Rodando M1 Anual...")
+            subprocess.run(_cmd_julia("m1_anual.jl", caminho_aloc_m1a, caminho_custo_m1a),
+                           capture_output=True, text=True, check=True)
 
-            cmd_heu = [
-                "python", str(PASTA_BASE / "heuristicaAlocacaoArgs.py"),
-                str(caminho_arquivo.resolve()),
-                str(caminho_aloc_heu.resolve()),
-                str(caminho_custo_heu.resolve()),
-                str(ARQUIVO_ROTAS.resolve()),
-                str(NUM_MANANCIAIS)
-            ]
+            print("  -> Rodando M2...")
+            subprocess.run(_cmd_julia("m2args.jl", caminho_aloc_m2, caminho_custo_m2),
+                           capture_output=True, text=True, check=True)
 
-            print("  -> Rodando Modelo Exato Diário (M1)...")
-            subprocess.run(cmd_m1, capture_output=True, text=True, check=True)
-
-            print("  -> Rodando Modelo Exato Anual (M2)...")
-            subprocess.run(cmd_m2, capture_output=True, text=True, check=True)
-
-            print("  -> Rodando Heurística (Python)...")
-            subprocess.run(cmd_heu, capture_output=True, text=True, check=True)
+            print("  -> Rodando Heurística...")
+            subprocess.run(["python", str(PASTA_BASE / "heuristicaAlocacaoArgs.py"),
+                            str(caminho_arquivo.resolve()), str(caminho_aloc_heu.resolve()),
+                            str(caminho_custo_heu.resolve()), str(ARQUIVO_ROTAS.resolve()),
+                            str(NUM_MANANCIAIS)],
+                           capture_output=True, text=True, check=True)
 
             # --- CAPTURA DOS CUSTOS REAIS ---
-            df_custo_m1 = pd.read_csv(caminho_custo_m1)
-            custo_m1 = round(float(df_custo_m1['Solucao_otima'].sum()), 2)
-
-            df_custo_m2 = pd.read_csv(caminho_custo_m2)
-            custo_m2 = round(float(df_custo_m2['Solucao_otima'].sum()), 2)
-
-            df_custo_heu = pd.read_csv(caminho_custo_heu)
-            custo_heu = round(float(df_custo_heu['Solucao_otima'].sum()), 2)
+            custo_m1d = round(float(pd.read_csv(caminho_custo_m1d)['Solucao_otima'].sum()), 2)
+            custo_m1a = round(float(pd.read_csv(caminho_custo_m1a)['Solucao_otima'].sum()), 2)
+            custo_m2  = round(float(pd.read_csv(caminho_custo_m2)['Solucao_otima'].sum()), 2)
+            custo_heu = round(float(pd.read_csv(caminho_custo_heu)['Solucao_otima'].sum()), 2)
 
             status = "Sucesso"
-            gap_heu_m1 = round(((custo_heu - custo_m1) / custo_m1)
-                               * 100, 2) if custo_m1 > 0 else 0.0
-            gap_m2_m1 = round(((custo_m2 - custo_m1) / custo_m1)
-                              * 100, 2) if custo_m1 > 0 else 0.0
+            gap_m1a_m1d = round(((custo_m1a - custo_m1d) / custo_m1d) * 100, 2) if custo_m1d > 0 else 0.0
+            gap_m2_m1d  = round(((custo_m2  - custo_m1d) / custo_m1d) * 100, 2) if custo_m1d > 0 else 0.0
+            gap_heu_m1d = round(((custo_heu - custo_m1d) / custo_m1d) * 100, 2) if custo_m1d > 0 else 0.0
 
         except subprocess.CalledProcessError as e:
             print(f"ERRO DE EXECUÇÃO na instância {nome_entrada}.")
             print(f"Detalhes do erro: {e.stderr}")
-            custo_m1, custo_m2, custo_heu = None, None, None
+            custo_m1d = custo_m1a = custo_m2 = custo_heu = None
             status = "Erro Execução"
-            gap_heu_m1, gap_m2_m1 = None, None
+            gap_m1a_m1d = gap_m2_m1d = gap_heu_m1d = None
         except Exception as e:
-            print(
-                f"ERRO DE LEITURA DOS RESULTADOS na instância {nome_entrada}: {e}")
-            custo_m1, custo_m2, custo_heu = None, None, None
+            print(f"ERRO DE LEITURA DOS RESULTADOS na instância {nome_entrada}: {e}")
+            custo_m1d = custo_m1a = custo_m2 = custo_heu = None
             status = "Erro Leitura"
-            gap_heu_m1, gap_m2_m1 = None, None
+            gap_m1a_m1d = gap_m2_m1d = gap_heu_m1d = None
 
         # Guarda os resultados
         dados_planilha.append({
@@ -126,11 +111,13 @@ def executar_automacao():
             "Total de Entregas": total_entregas,
             "Pico de Abastecimento (Max/Dia)": pico_abastecimento,
             "Status": status,
-            "Custo Modelo Exato (M1)": custo_m1,
-            "Custo Modelo Anual (M2)": custo_m2,
+            "Custo M1 Diário": custo_m1d,
+            "Custo M1 Anual": custo_m1a,
+            "Custo M2": custo_m2,
             "Custo Heurística": custo_heu,
-            "Gap Heurística vs M1 (%)": gap_heu_m1,
-            "Gap M2 vs M1 (%)": gap_m2_m1,
+            "Gap M1 Anual vs M1 Diário (%)": gap_m1a_m1d,
+            "Gap M2 vs M1 Diário (%)": gap_m2_m1d,
+            "Gap Heurística vs M1 Diário (%)": gap_heu_m1d,
             "Caminho da Entrada": str(caminho_arquivo.resolve()),
             "Pasta de Saída": str(pasta_alocacao.resolve())
         })
