@@ -45,9 +45,9 @@ function resolve_M2(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
     linModel = Model(() -> Gurobi.Optimizer(env))
     set_silent(linModel) # Silencia os logs infinitos do solver no terminal do Python
     
-    set_time_limit_sec(linModel, 86400.0)
-    #set_optimizer_attribute(linModel, "MIPFocus", 1) 
-    #set_optimizer_attribute(linModel, "NodefileStart", 4.0) 
+    set_time_limit_sec(linModel, 3600.0)
+    #set_optimizer_attribute(linModel, "MIPFocus", 1)
+    set_optimizer_attribute(linModel, "NodefileStart", 4.0)
 
     @variable(linModel, 0 <= x[i=1:NM, j=1:NB, k=1:ND; matriz_demanda[j,k] > 0], Int) 
     @variable(linModel, y[i=1:NM, j=1:NB], Bin)              

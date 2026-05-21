@@ -38,7 +38,8 @@ try:
     # ... (busca de colunas mantida)
     col_ben = next((c for c in df_rotas.columns if 'beneficiario' in c.lower() or 'id_beneficiario' in c.lower()), None)
     col_fonte = next((c for c in df_rotas.columns if 'fonte' in c.lower() or 'id_fonte' in c.lower()), None)
-    col_dist = next((c for c in df_rotas.columns if 'dist' in c.lower()), None)
+    col_dist = next((c for c in df_rotas.columns if 'distance_w_factor' in c.lower()), None) or \
+               next((c for c in df_rotas.columns if 'dist' in c.lower()), None)
 
     if not col_ben or not col_fonte:
         idx_ben, idx_fonte, idx_dist = 0, 1, 2
