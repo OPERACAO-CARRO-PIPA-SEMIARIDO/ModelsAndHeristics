@@ -35,21 +35,20 @@ onde `y` = pico diário, `Σ x` = total de entregas no ano e `D` = número de di
 |------------|------|-----------|
 | `00`       | 0,00 | Minimiza apenas o total de entregas; ignora pico |
 | `00_350`   | 0,00 | Igual a `00`, mas com restrição explícita de pico ≤ 350 |
-| `01w24`    | 0,01 | Peso mínimo no pico; *warm start* a partir de `00`; limite de 24 h |
-| `10wLim`   | 0,10 | Peso baixo no pico; *warm start*; limite de tempo reduzido |
+| `01w24`    | 0,01 | Peso mínimo no pico; *warm start* a partir de `heu_lim`; limite de 24 h |
+| `10wLim`   | 0,10 | Peso baixo no pico; *warm start* a partir de `heu_lim` |
 | `5072h`    | 0,50 | Peso igual entre pico e entregas; sem *warm start*; limite de 72 h |
-| `50wLim`   | 0,50 | Igual ao anterior com *warm start*; limite de tempo reduzido |
-| `75w00`    | 0,75 | Peso alto no pico; *warm start* inicializado com a solução `00` |
+| `50wLim`   | 0,50 | Mesmo p que `5072h`; *warm start* a partir de `heu_lim` |
+| `75w00`    | 0,75 | Peso alto no pico; *warm start* a partir da solução `00` |
 | `heu_full` | —    | Calendário gerado pela heurística de agendamento — modo *full*: enche a cisterna a cada visita |
 | `heu_lim`  | —    | Calendário gerado pela heurística de agendamento — modo *limite*: entrega apenas o mínimo necessário |
 
 **Convenção dos sufixos:**
 - Dois dígitos iniciais = `p × 100` (ex.: `10` → p = 0,10)
-- `w` = *warm start* (Gurobi inicializado com solução viável anterior)
-- `Lim` = limite de tempo curto (execução interrompida antes da convergência)
-- `_350` = restrição de pico ≤ 350 adicionada ao modelo
+- `wLim` = *warm start* inicializado com a solução `heu_lim`
+- `w00` = *warm start* inicializado com a solução `00`
+- `_350` = restrição explícita de pico ≤ 350 adicionada ao modelo
 - `72h` = limite de tempo de 72 horas
-- `00` ao final de `75w00` = fonte do *warm start* (solução da instância `00`)
 
 ---
 
