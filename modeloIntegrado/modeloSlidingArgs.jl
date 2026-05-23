@@ -13,14 +13,16 @@ const TOTAL_MANANCIAIS_ARQUIVO = 92
 const CAPACIDADE_MAX_MANANCIAL = 12
 
 function rodar_sliding_window(
-    p::Float64, 
-    nome_pasta::String, 
-    dia_inicio::Int, 
+    p::Float64,
+    nome_pasta::String,
+    dia_inicio::Int,
     num_dias_periodo::Int;
     caminho_volumes_iniciais=nothing,
     pasta_anterior=nothing,
     overlap_dias=0,
-    num_candidatos=1
+    num_candidatos=3,
+    num_beneficiarios=3315,
+    num_mananciais=92
 )
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
@@ -49,9 +51,9 @@ function rodar_sliding_window(
     calendarios_full = ler_csv("CalendariosObrigatorios.csv")
     rotas = ler_csv("rotas")
 
-    TOTAL_BENEFICIARIOS = 3315
-    TOTAL_MANANCIAIS = 92
-    
+    TOTAL_BENEFICIARIOS = num_beneficiarios
+    TOTAL_MANANCIAIS    = num_mananciais
+
     # NUM_CANDIDATOS agora é usado da assinatura da função
     CANDIDATOS_REAIS = min(num_candidatos, TOTAL_MANANCIAIS)
 
@@ -80,7 +82,8 @@ function rodar_sliding_window(
     quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
     distancias = rotas.distance_w_factor
-    Dij_completa = transpose(reshape(distancias, (TOTAL_BENEFICIARIOS, TOTAL_MANANCIAIS_ARQUIVO)))
+    NB_ARQUIVO   = length(distancias) ÷ TOTAL_MANANCIAIS_ARQUIVO  # tamanho real do arquivo (3315)
+    Dij_completa = transpose(reshape(distancias, (NB_ARQUIVO, TOTAL_MANANCIAIS_ARQUIVO)))
     Dij = Dij_completa[nm, nb]
 
     candidatos_por_beneficiario = Dict{Int, Vector{Int}}()
@@ -309,10 +312,15 @@ if length(ARGS) >= 4
     pasta = ARGS[2]
     dia_ini = parse(Int, ARGS[3])
     num_d = parse(Int, ARGS[4])
-    vol_init = length(ARGS) >= 5 ? (ARGS[5] == "nothing" ? nothing : ARGS[5]) : nothing
-    pasta_ant = length(ARGS) >= 6 ? (ARGS[6] == "nothing" ? nothing : ARGS[6]) : nothing
-    overlap = length(ARGS) >= 7 ? parse(Int, ARGS[7]) : 0
+    vol_init     = length(ARGS) >= 5 ? (ARGS[5] == "nothing" ? nothing : ARGS[5]) : nothing
+    pasta_ant    = length(ARGS) >= 6 ? (ARGS[6] == "nothing" ? nothing : ARGS[6]) : nothing
+    overlap      = length(ARGS) >= 7 ? parse(Int, ARGS[7]) : 0
     k_candidatos = length(ARGS) >= 8 ? parse(Int, ARGS[8]) : 1
-    
-    rodar_sliding_window(p, pasta, dia_ini, num_d, caminho_volumes_iniciais=vol_init, pasta_anterior=pasta_ant, overlap_dias=overlap, num_candidatos=k_candidatos)
+    nb_arg       = length(ARGS) >= 9 ? parse(Int, ARGS[9]) : 3315
+    nm_arg       = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 92
+
+    rodar_sliding_window(p, pasta, dia_ini, num_d,
+        caminho_volumes_iniciais=vol_init, pasta_anterior=pasta_ant,
+        overlap_dias=overlap, num_candidatos=k_candidatos,
+        num_beneficiarios=nb_arg, num_mananciais=nm_arg)
 end
