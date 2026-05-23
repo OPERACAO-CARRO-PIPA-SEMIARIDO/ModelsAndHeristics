@@ -20,12 +20,11 @@ INTEGRADO_NB = 1250
 INTEGRADO_NM = 40
 
 # Rolling horizon (sliding window com sobreposição)
-# "X-X" = janela de X dias, passo de X dias (sobreposicao = 0)
-# Para adicionar sobreposição: aumente "sobreposicao" e a janela cresce por janela = passo + sobreposicao
+# "X-X" = janela de X dias, sobreposicao de 14 dias (passo = janela - 14)
 ROLLING_CONFIGS = [
-    {"janela": 60,  "sobreposicao": 0, "nb": 3315, "nm": 92},
-    {"janela": 90,  "sobreposicao": 0, "nb": 3315, "nm": 92},
-    {"janela": 120, "sobreposicao": 0, "nb": 3315, "nm": 92},
+    {"janela": 60,  "sobreposicao": 14, "nb": 3315, "nm": 92},
+    {"janela": 90,  "sobreposicao": 14, "nb": 3315, "nm": 92},
+    {"janela": 120, "sobreposicao": 14, "nb": 3315, "nm": 92},
 ]
 
 
