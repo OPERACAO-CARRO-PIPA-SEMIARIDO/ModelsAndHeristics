@@ -29,7 +29,7 @@ for nome, caminho in MAPA_INTEGRADO.items():
         gap_mip   = round(float(r["Gap_Percent"]), 4)
         gap_vs    = round(((custo_int - custo_m1d) / custo_m1d) * 100, 2) if custo_m1d else None
         blocos.append({
-            "Instancia":              nome,
+            "Instancia":              "Modelo Integrado",
             "Hora Limite (h)":        int(r["Hora"]),
             "Tempo Limite (s)":       int(r["Tempo_Segundos"]),
             "Custo Integrado":        custo_int,
