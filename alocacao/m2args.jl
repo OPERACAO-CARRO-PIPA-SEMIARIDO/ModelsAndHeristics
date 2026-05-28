@@ -41,16 +41,18 @@ Ajk = Matrix{Float64}(abastecimento[:, 2:end])
 # 3. MODELO MATEMÁTICO OTIMIZADO (ESPARSO)
 # ==========================================
 function resolve_M2(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
+    t0 = time()
+
     env = Gurobi.Env()
     linModel = Model(() -> Gurobi.Optimizer(env))
-    set_silent(linModel) # Silencia os logs infinitos do solver no terminal do Python
-    
+    set_silent(linModel)
+
     set_time_limit_sec(linModel, 3600.0)
     #set_optimizer_attribute(linModel, "MIPFocus", 1)
     set_optimizer_attribute(linModel, "NodefileStart", 4.0)
 
-    @variable(linModel, 0 <= x[i=1:NM, j=1:NB, k=1:ND; matriz_demanda[j,k] > 0], Int) 
-    @variable(linModel, y[i=1:NM, j=1:NB], Bin)              
+    @variable(linModel, 0 <= x[i=1:NM, j=1:NB, k=1:ND; matriz_demanda[j,k] > 0], Int)
+    @variable(linModel, y[i=1:NM, j=1:NB], Bin)
 
     @constraint(linModel, cap_diaria[i=1:NM, k=1:ND], sum(x[i,j,k] for j in 1:NB if matriz_demanda[j,k] > 0) <= cap_max)
     @constraint(linModel, atende_dem[j=1:NB, k=1:ND; matriz_demanda[j,k] > 0], sum(x[i,j,k] for i in 1:NM) == matriz_demanda[j,k])
@@ -59,24 +61,25 @@ function resolve_M2(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
 
     @objective(linModel, Min, sum(matriz_dist[i,j] * x[i,j,k] for i in 1:NM, j in 1:NB, k in 1:ND if matriz_demanda[j,k] > 0))
 
-    t0 = time()
     optimize!(linModel)
     tempo_exec = time() - t0
 
     status = termination_status(linModel)
 
+    gap_val = try MOI.get(linModel, MOI.RelativeGap()) catch; 0.0 end
+
     if status == MOI.OPTIMAL
-        return value.(y), objective_value(linModel), num_variables(linModel), tempo_exec, "Otimo"
+        return value.(y), objective_value(linModel), tempo_exec, "Otimo", gap_val
     elseif status == MOI.TIME_LIMIT && has_values(linModel)
         println("AVISO: Limite de tempo atingido. Solução subótima retornada.")
-        return value.(y), objective_value(linModel), num_variables(linModel), tempo_exec, "SubOtimo_LimiteTempo"
+        return value.(y), objective_value(linModel), tempo_exec, "SubOtimo_LimiteTempo", gap_val
     else
         println("ERRO: Nenhuma solução viável encontrada. Status: $(status)")
-        return nothing, 0.0, num_variables(linModel), tempo_exec, string(status)
+        return nothing, 0.0, tempo_exec, string(status), NaN
     end
 end
 
-y_opt, custo_total, num_vars, tempo_exec, status_str = resolve_M2(NUM_MANANCIAIS, NUM_BENEFICIARIOS, NUM_DIAS, Dij, Ajk, CAPACIDADE_MAX_MANANCIAL)
+y_opt, custo_total, tempo_exec, status_str, gap_relativo = resolve_M2(NUM_MANANCIAIS, NUM_BENEFICIARIOS, NUM_DIAS, Dij, Ajk, CAPACIDADE_MAX_MANANCIAL)
 
 if y_opt !== nothing
     df_alocacao = copy(abastecimento)
@@ -102,8 +105,8 @@ if y_opt !== nothing
     df_metricas = DataFrame(
         Tempo_de_Execucao = [tempo_exec],
         Solucao_otima     = [custo_total],
-        Num_Variaveis     = [num_vars],
-        Status_Solucao    = [status_str]
+        Status_Solucao    = [status_str],
+        Gap_Relativo      = [gap_relativo]
     )
 
     CSV.write(OUTPUT_CUSTO,    df_metricas)
@@ -112,8 +115,8 @@ else
     df_metricas = DataFrame(
         Tempo_de_Execucao = [tempo_exec],
         Solucao_otima     = [0.0],
-        Num_Variaveis     = [num_vars],
-        Status_Solucao    = [status_str]
+        Status_Solucao    = [status_str],
+        Gap_Relativo      = [gap_relativo]
     )
     CSV.write(OUTPUT_CUSTO, df_metricas)
     println("Nenhuma solução exportada.")

@@ -117,8 +117,9 @@ for d in range(num_dias):
     custos.append(c)
 
 df_metricas = pd.DataFrame({
-    "Tempo_de_Execucao": [time.time() - start_time] * num_dias, 
-    "Solucao_otima": custos,
-    "Num_Variaveis": [num_beneficiarios] * num_dias
+    "Tempo_de_Execucao": [time.time() - start_time],
+    "Solucao_otima": [sum(custos)],
+    "Status_Solucao": ["Heuristica"],
+    "Gap_Relativo": [0.0]
 })
 df_metricas.to_csv(OUTPUT_CUSTOS, index=False)

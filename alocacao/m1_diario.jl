@@ -83,7 +83,7 @@ function resolvePL(dia, dados)
     status = termination_status(linModel)
     if status != MOI.OPTIMAL
         println("AVISO: dia $dia — status $(status). Dia pulado.")
-        return 0.0, num_variables(linModel), string(status)
+        return 0.0, string(status), 0.0
     end
 
     x_sol = value.(x)
@@ -104,7 +104,8 @@ function resolvePL(dia, dados)
         end
     end
 
-    return objective_value(linModel), num_variables(linModel), "Otimo"
+    gap_val = try MOI.get(linModel, MOI.RelativeGap()) catch; 0.0 end
+    return objective_value(linModel), "Otimo", gap_val
 end
 
 function roda_PL(ND_total::Int)
@@ -112,16 +113,16 @@ function roda_PL(ND_total::Int)
         Dia               = Int[],
         Tempo_de_Execucao = Float64[],
         Solucao_otima     = Float64[],
-        Num_Variaveis     = Int[],
-        Status_Solucao    = String[]
+        Status_Solucao    = String[],
+        Gap_Relativo      = Float64[]
     )
     dados = retornaDados()
 
     for dia in 1:ND_total
         t0 = time()
-        custo, nvars, status = resolvePL(dia, dados)
+        custo, status, gap_val = resolvePL(dia, dados)
         t1 = time()
-        push!(df_resultados, (dia, t1 - t0, custo, nvars, status))
+        push!(df_resultados, (dia, t1 - t0, custo, status, gap_val))
     end
 
     CSV.write(output_custo_file,    df_resultados)

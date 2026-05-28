@@ -6,10 +6,10 @@ import subprocess
 # ==========================================
 # 1. DEFINIÇÃO DE CAMINHOS BASE (Dinâmico)
 # ==========================================
-NUM_MANANCIAIS = 92
+NUM_MANANCIAIS = 40
 PASTA_BASE     = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao")
-PASTA_ENTRADAS = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas")
-PASTA_SAIDAS   = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/saidas_3")
+PASTA_ENTRADAS = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/entradas_1250")
+PASTA_SAIDAS   = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/saidas_1250_40_365_2")
 ARQUIVO_ROTAS  = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/alocacao/Dados/rotas")
 
 PASTA_SAIDAS.mkdir(parents=True, exist_ok=True)
@@ -81,11 +81,25 @@ def executar_automacao():
                             str(NUM_MANANCIAIS)],
                            capture_output=True, text=True, check=True)
 
-            # --- CAPTURA DOS CUSTOS REAIS ---
-            custo_m1d = round(float(pd.read_csv(caminho_custo_m1d)['Solucao_otima'].sum()), 2)
-            custo_m1a = round(float(pd.read_csv(caminho_custo_m1a)['Solucao_otima'].sum()), 2)
-            custo_m2  = round(float(pd.read_csv(caminho_custo_m2)['Solucao_otima'].sum()), 2)
-            custo_heu = round(float(pd.read_csv(caminho_custo_heu)['Solucao_otima'].sum()), 2)
+            # --- CAPTURA DOS CUSTOS, TEMPOS E GAPS REAIS ---
+            df_m1d = pd.read_csv(caminho_custo_m1d)
+            df_m1a = pd.read_csv(caminho_custo_m1a)
+            df_m2  = pd.read_csv(caminho_custo_m2)
+            df_heu = pd.read_csv(caminho_custo_heu)
+
+            custo_m1d = round(float(df_m1d['Solucao_otima'].sum()), 2)
+            custo_m1a = round(float(df_m1a['Solucao_otima'].sum()), 2)
+            custo_m2  = round(float(df_m2['Solucao_otima'].sum()),  2)
+            custo_heu = round(float(df_heu['Solucao_otima'].sum()), 2)
+
+            tempo_m1d = round(float(df_m1d['Tempo_de_Execucao'].sum()), 4)
+            tempo_m1a = round(float(df_m1a['Tempo_de_Execucao'].iloc[0]), 4)
+            tempo_m2  = round(float(df_m2['Tempo_de_Execucao'].iloc[0]),  4)
+            tempo_heu = round(float(df_heu['Tempo_de_Execucao'].iloc[0]), 4)
+
+            # Gap MIP do solver (fração → %) — M1 Diário é sempre 0 (resolve até ótimo por dia)
+            gap_mip_m1a = round(float(df_m1a['Gap_Relativo'].iloc[0]) * 100, 4)
+            gap_mip_m2  = round(float(df_m2['Gap_Relativo'].iloc[0])  * 100, 4)
 
             status = "Sucesso"
             gap_m1a_m1d = round(((custo_m1a - custo_m1d) / custo_m1d) * 100, 2) if custo_m1d > 0 else 0.0
@@ -96,11 +110,15 @@ def executar_automacao():
             print(f"ERRO DE EXECUÇÃO na instância {nome_entrada}.")
             print(f"Detalhes do erro: {e.stderr}")
             custo_m1d = custo_m1a = custo_m2 = custo_heu = None
+            tempo_m1d = tempo_m1a = tempo_m2 = tempo_heu = None
+            gap_mip_m1a = gap_mip_m2 = None
             status = "Erro Execução"
             gap_m1a_m1d = gap_m2_m1d = gap_heu_m1d = None
         except Exception as e:
             print(f"ERRO DE LEITURA DOS RESULTADOS na instância {nome_entrada}: {e}")
             custo_m1d = custo_m1a = custo_m2 = custo_heu = None
+            tempo_m1d = tempo_m1a = tempo_m2 = tempo_heu = None
+            gap_mip_m1a = gap_mip_m2 = None
             status = "Erro Leitura"
             gap_m1a_m1d = gap_m2_m1d = gap_heu_m1d = None
 
@@ -117,6 +135,12 @@ def executar_automacao():
             "Gap M1 Anual vs M1 Diário (%)": gap_m1a_m1d,
             "Gap M2 vs M1 Diário (%)": gap_m2_m1d,
             "Gap Heurística vs M1 Diário (%)": gap_heu_m1d,
+            "Tempo M1 Diário (s)": tempo_m1d,
+            "Tempo M1 Anual (s)": tempo_m1a,
+            "Tempo M2 (s)": tempo_m2,
+            "Tempo Heurística (s)": tempo_heu,
+            "Gap MIP M1 Anual (%)": gap_mip_m1a,
+            "Gap MIP M2 (%)": gap_mip_m2,
             "Caminho da Entrada": str(caminho_arquivo.resolve()),
             "Pasta de Saída": str(pasta_alocacao.resolve())
         })
@@ -152,19 +176,18 @@ def executar_automacao():
                 col_name = str(headers[idx])
 
                 if cell.value is not None:
-                    # CORREÇÃO 2: Forçar exibição das 2 casas decimais + separador de milhar (Ex: 2.467.920,50)
                     if "Custo" in col_name and isinstance(cell.value, (int, float)):
                         cell.number_format = '#,##0.00'
 
-                    # Fixar os Gaps em 2 casas decimais sempre (Ex: 11,00)
                     elif "Gap" in col_name and isinstance(cell.value, (int, float)):
-                        cell.number_format = '0.00'
+                        cell.number_format = '0.0000'
 
-                    # Formatar Entregas e Pico com ponto de milhar (Ex: 43.418)
+                    elif "Tempo" in col_name and isinstance(cell.value, (int, float)):
+                        cell.number_format = '#,##0.0000'
+
                     elif ("Total" in col_name or "Pico" in col_name) and isinstance(cell.value, (int, float)):
                         cell.number_format = '#,##0'
 
-                    # CORREÇÃO 3: Avisar ao Excel que o nome é TEXTO puro para ele não transformar "00" em 0
                     elif "Nome" in col_name:
                         cell.number_format = '@'
                         cell.value = str(cell.value)

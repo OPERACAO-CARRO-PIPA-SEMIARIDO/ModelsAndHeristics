@@ -43,6 +43,8 @@ Ajk = Matrix{Float64}(abastecimento[:, 2:end])
 # Resolve o ano inteiro como um único ILP, mas sem fixar a fonte por beneficiário.
 # ==========================================
 function resolve_M1_anual(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
+    t0 = time()
+
     env      = Gurobi.Env()
     linModel = Model(() -> Gurobi.Optimizer(env))
     set_silent(linModel)
@@ -60,24 +62,25 @@ function resolve_M1_anual(NM, NB, ND, matriz_dist, matriz_demanda, cap_max)
         sum(matriz_dist[i,j] * x[i,j,k]
             for i in 1:NM, j in 1:NB, k in 1:ND if matriz_demanda[j,k] > 0))
 
-    t0 = time()
     optimize!(linModel)
     tempo_exec = time() - t0
 
     status = termination_status(linModel)
 
+    gap_val = try MOI.get(linModel, MOI.RelativeGap()) catch; 0.0 end
+
     if status == MOI.OPTIMAL
-        return value.(x), objective_value(linModel), num_variables(linModel), tempo_exec, "Otimo"
+        return value.(x), objective_value(linModel), tempo_exec, "Otimo", gap_val
     elseif status == MOI.TIME_LIMIT && has_values(linModel)
         println("AVISO: Limite de tempo atingido. Solução subótima retornada.")
-        return value.(x), objective_value(linModel), num_variables(linModel), tempo_exec, "SubOtimo_LimiteTempo"
+        return value.(x), objective_value(linModel), tempo_exec, "SubOtimo_LimiteTempo", gap_val
     else
         println("ERRO: Nenhuma solução viável encontrada. Status: $(status)")
-        return nothing, 0.0, num_variables(linModel), tempo_exec, string(status)
+        return nothing, 0.0, tempo_exec, string(status), NaN
     end
 end
 
-x_opt, custo_total, num_vars, tempo_exec, status_str =
+x_opt, custo_total, tempo_exec, status_str, gap_relativo =
     resolve_M1_anual(NUM_MANANCIAIS, NUM_BENEFICIARIOS, NUM_DIAS, Dij, Ajk, CAPACIDADE_MAX_MANANCIAL)
 
 if x_opt !== nothing
@@ -106,8 +109,8 @@ if x_opt !== nothing
     df_metricas = DataFrame(
         Tempo_de_Execucao = [tempo_exec],
         Solucao_otima     = [custo_total],
-        Num_Variaveis     = [num_vars],
-        Status_Solucao    = [status_str]
+        Status_Solucao    = [status_str],
+        Gap_Relativo      = [gap_relativo]
     )
 
     CSV.write(OUTPUT_CUSTO,    df_metricas)
@@ -116,8 +119,8 @@ else
     df_metricas = DataFrame(
         Tempo_de_Execucao = [tempo_exec],
         Solucao_otima     = [0.0],
-        Num_Variaveis     = [num_vars],
-        Status_Solucao    = [status_str]
+        Status_Solucao    = [status_str],
+        Gap_Relativo      = [gap_relativo]
     )
     CSV.write(OUTPUT_CUSTO, df_metricas)
     println("Nenhuma solução exportada.")
