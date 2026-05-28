@@ -94,6 +94,7 @@ function rodar_rolling_horizon(
     set_optimizer_attribute(model, "MIPGap", 0.001)
     set_optimizer_attribute(model, "MemLimit", 28.0)
     set_optimizer_attribute(model, "Threads", 4)
+    set_optimizer_attribute(model, "MIPFocus", 1)
 
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd_local], Int)
     @variable(model, z[j in nb, i in candidatos_por_beneficiario[j]], Bin)
@@ -154,12 +155,21 @@ function rodar_rolling_horizon(
             V[j, num_dias_periodo] >= U[j] * dias_inuteis_futuros)
     end
 
-    # --- Warm Start (z e x da sobreposição) ---
+    # --- Warm Start base: fonte mais próxima para cada beneficiário ---
+    # Fornece um ponto inicial válido para z; ajuda Gurobi a encontrar solução viável mais rápido.
+    for j in nb
+        set_start_value(z[j, candidatos_por_beneficiario[j][1]], 1.0)
+        for i in candidatos_por_beneficiario[j][2:end]
+            set_start_value(z[j, i], 0.0)
+        end
+    end
+
+    # --- Warm Start (z e x da sobreposição do período anterior) ---
     if !isnothing(pasta_anterior) && isdir(pasta_anterior) && overlap_dias > 0
         println(">>> Aplicando Warm Start da pasta: $pasta_anterior")
         try
-            df_aloc  = CSV.read(joinpath(pasta_anterior, "alocacao_melhor_absoluto.csv"), DataFrame)
-            df_abast = CSV.read(joinpath(pasta_anterior, "abastecimento_melhor_absoluto.csv"), DataFrame)
+            df_aloc  = CSV.read(joinpath(pasta_anterior, "alocacao_resultado.csv"), DataFrame)
+            df_abast = CSV.read(joinpath(pasta_anterior, "abastecimento_resultado.csv"), DataFrame)
 
             for j in nb
                 fonte_escolhida = 0
@@ -223,8 +233,9 @@ function rodar_rolling_horizon(
         println("    $n_fixados beneficiários com fonte fixada.")
     end
 
-    # --- Otimização (limite de 2 horas) ---
-    horas_checkpoints = 2:2:2
+    # --- Otimização (limite de 2 horas, checkpoints a cada 15min/1h/2h) ---
+    # Checkpoints curtos garantem que o primeiro resultado viável seja salvo logo que encontrado.
+    horas_checkpoints = [0.25, 1.0, 2.0]
     melhor_obj_encontrado = Inf
     tempo_inicio_global = time()
 
