@@ -9,22 +9,15 @@ from pathlib import Path
 # ==========================================
 PASTA_BASE   = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/modeloIntegrado")
 PASTA_SAIDAS = PASTA_BASE
-JULIA_SCRIPT = PASTA_BASE / "modeloSlidingArgs.jl"
+JULIA_SCRIPT = PASTA_BASE / "modeloRollingArgs.jl"
 ROTAS_FILE   = PASTA_BASE.parent / "alocacao" / "Dados" / "rotas"
 TOTAL_DIAS   = 365
 PESO_PICO    = 0.0
 K_CANDIDATOS = 3
 
-# Modelo integrado: janela única cobrindo todo o período (uma só chamada ao solver)
-INTEGRADO_NB = 1250
-INTEGRADO_NM = 40
-
-# Rolling horizon (sliding window com sobreposição)
-# "X-X" = janela de X dias, sobreposicao de 14 dias (passo = janela - 14)
+# Rolling horizon — janela 90 dias, sobreposição 14 dias, passo 76 dias
 ROLLING_CONFIGS = [
-    {"janela": 60,  "sobreposicao": 14, "nb": 3315, "nm": 92},
-    {"janela": 90,  "sobreposicao": 14, "nb": 3315, "nm": 92},
-    {"janela": 120, "sobreposicao": 14, "nb": 3315, "nm": 92},
+    {"janela": 90, "sobreposicao": 14, "nb": 3315, "nm": 92},
 ]
 
 
@@ -201,20 +194,14 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
 # ==========================================
 
 def main():
-    # --- 1. Modelo integrado (janela única = ano inteiro) ---
-    print("\n" + "=" * 60)
-    print(f"MODELO INTEGRADO: {INTEGRADO_NB} beneficiários, {INTEGRADO_NM} mananciais, {TOTAL_DIAS} dias")
-    pasta_int = PASTA_SAIDAS / f"integrado_{INTEGRADO_NB}nb_{INTEGRADO_NM}nm"
-    executar_janela(TOTAL_DIAS, 0, INTEGRADO_NB, INTEGRADO_NM, pasta_int)
-
-    # --- 2. Rolling horizon com diferentes janelas ---
+    # --- Rolling horizon ---
     for cfg in ROLLING_CONFIGS:
         j = cfg["janela"]
         s = cfg["sobreposicao"]
         nb = cfg["nb"]
         nm = cfg["nm"]
         passo = j - s
-        tag   = f"rolling_{j}_{passo}"
+        tag   = f"rolling_{j}_{s}_{K_CANDIDATOS}"
 
         print("\n" + "=" * 60)
         print(f"ROLLING HORIZON: janela={j}, sobreposicao={s}, passo={passo}, nb={nb}, nm={nm}")
