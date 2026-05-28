@@ -40,8 +40,8 @@ def consolidar_resultados(output_dir, num_periodos):
         except Exception:
             continue
 
-        file_abast = pasta / "abastecimento_melhor_absoluto.csv"
-        file_aloc  = pasta / "alocacao_melhor_absoluto.csv"
+        file_abast = pasta / "abastecimento_resultado.csv"
+        file_aloc  = pasta / "alocacao_resultado.csv"
         if not file_abast.exists():
             continue
 
@@ -115,6 +115,30 @@ def gerar_controle(output_dir, k_candidatos=K_CANDIDATOS, nm_usado=92):
         print(f"    Erro ao gerar controle: {e}")
 
 
+def atualizar_fontes_definidas(pasta_periodo, fontes_dict):
+    """Lê alocacao_resultado.csv do período e registra, para cada beneficiário
+    ainda sem fonte atribuída, a primeira fonte encontrada no período."""
+    aloc_file  = pasta_periodo / "alocacao_resultado.csv"
+    abast_file = pasta_periodo / "abastecimento_resultado.csv"
+    if not aloc_file.exists() or not abast_file.exists():
+        return fontes_dict
+
+    df_aloc  = pd.read_csv(aloc_file)
+    df_abast = pd.read_csv(abast_file)
+    dias_cols = [c for c in df_aloc.columns if c != "Beneficiarios"]
+
+    for idx in range(len(df_aloc)):
+        benef_id = int(df_aloc.loc[idx, "Beneficiarios"])
+        if benef_id in fontes_dict:
+            continue
+        for dia in dias_cols:
+            if df_abast.loc[idx, dia] > 0 and df_aloc.loc[idx, dia] > 0:
+                fontes_dict[benef_id] = int(df_aloc.loc[idx, dia])
+                break
+
+    return fontes_dict
+
+
 # ==========================================
 # EXECUTOR DE JANELA (SLIDING WINDOW CORE)
 # ==========================================
@@ -124,9 +148,11 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
     pasta_saida = Path(pasta_saida)
     pasta_saida.mkdir(parents=True, exist_ok=True)
 
-    passo                = janela - sobreposicao
+    passo                 = janela - sobreposicao
     volumes_iniciais_path = "nothing"
     pasta_anterior        = "nothing"
+    fontes_definidas_path = "nothing"
+    fontes_dict           = {}
     dia_inicio            = 1
     periodo_count         = 1
 
@@ -136,6 +162,8 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
         pasta_periodo.mkdir(exist_ok=True)
 
         print(f"\n  Período {periodo_count}: dias {dia_inicio} a {dia_inicio + num_dias - 1}")
+        if fontes_dict:
+            print(f"    Fontes já definidas: {len(fontes_dict)}/{nb} beneficiários")
 
         cmd = [
             "julia", str(JULIA_SCRIPT),
@@ -149,6 +177,7 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
             str(K_CANDIDATOS),
             str(nb),
             str(nm),
+            str(fontes_definidas_path),
         ]
 
         try:
@@ -156,6 +185,15 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
         except subprocess.CalledProcessError as e:
             print(f"    ERRO ao executar Julia: {e}")
             break
+
+        # Registra fontes definidas neste período e persiste para o próximo
+        fontes_dict = atualizar_fontes_definidas(pasta_periodo, fontes_dict)
+        if fontes_dict:
+            df_fontes = pd.DataFrame([
+                {"Beneficiario": j, "Fonte": f} for j, f in fontes_dict.items()
+            ])
+            fontes_definidas_path = pasta_saida / "fontes_definidas.csv"
+            df_fontes.to_csv(fontes_definidas_path, index=False)
 
         volumes_todos = pasta_periodo / "volumes_todos_dias.csv"
         if not volumes_todos.exists():
@@ -166,8 +204,8 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
             break
 
         # Prepara volumes iniciais para o próximo período
-        proximo_dia  = dia_inicio + passo
-        dia_local_ref = passo  # = dia na janela atual cujos volumes passam adiante
+        proximo_dia   = dia_inicio + passo
+        dia_local_ref = passo
 
         df_vol   = pd.read_csv(volumes_todos)
         col_name = str(dia_local_ref)

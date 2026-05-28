@@ -36,7 +36,8 @@ function rodar_rolling_horizon(
     overlap_dias::Int=0,
     num_candidatos::Int=3,
     num_beneficiarios::Int=3315,
-    num_mananciais::Int=92
+    num_mananciais::Int=92,
+    fontes_definidas_path=nothing
 )
     caminho_pasta = joinpath(pwd(), nome_pasta)
     if !isdir(caminho_pasta)
@@ -200,6 +201,28 @@ function rodar_rolling_horizon(
         end
     end
 
+    # --- Fixa fontes já definidas em períodos anteriores ---
+    # Beneficiários com fonte definida têm z fixado — o solver não pode alterar a escolha.
+    if !isnothing(fontes_definidas_path) && isfile(fontes_definidas_path)
+        println(">>> Fixando fontes definidas de: $fontes_definidas_path")
+        df_fontes = CSV.read(fontes_definidas_path, DataFrame)
+        n_fixados = 0
+        for row in eachrow(df_fontes)
+            j     = Int(row.Beneficiario)
+            fonte = Int(row.Fonte)
+            if j in nb && fonte in candidatos_por_beneficiario[j]
+                fix(z[j, fonte], 1.0; force=true)
+                for i in candidatos_por_beneficiario[j]
+                    if i != fonte
+                        fix(z[j, i], 0.0; force=true)
+                    end
+                end
+                n_fixados += 1
+            end
+        end
+        println("    $n_fixados beneficiários com fonte fixada.")
+    end
+
     # --- Otimização (limite de 2 horas) ---
     horas_checkpoints = 2:2:2
     melhor_obj_encontrado = Inf
@@ -228,7 +251,7 @@ function rodar_rolling_horizon(
                 tempo_minutos = round((time() - tempo_inicio_global) / 60, digits=2)
                 println(">>> Melhor solução encontrada ($tempo_minutos min): Obj = $obj")
                 melhor_obj_encontrado = obj
-                salvar_saidas_rolling(model, caminho_pasta, "melhor_absoluto", nb, nd_local, candidatos_por_beneficiario)
+                salvar_saidas_rolling(model, caminho_pasta, "resultado", nb, nd_local, candidatos_por_beneficiario)
                 salvar_volumes_finais(model, caminho_pasta, "volumes_finais", nb, nd_local)
             end
         end
@@ -340,12 +363,13 @@ if length(ARGS) >= 4
     nome_pasta = ARGS[2]
     dia_inicio = parse(Int, ARGS[3])
     num_dias   = parse(Int, ARGS[4])
-    vol_init   = length(ARGS) >= 5 ? (ARGS[5] == "nothing" ? nothing : ARGS[5]) : nothing
-    pasta_ant  = length(ARGS) >= 6 ? (ARGS[6] == "nothing" ? nothing : ARGS[6]) : nothing
-    overlap    = length(ARGS) >= 7 ? parse(Int, ARGS[7]) : 0
-    k_cand     = length(ARGS) >= 8 ? parse(Int, ARGS[8]) : 3
-    nb_arg     = length(ARGS) >= 9 ? parse(Int, ARGS[9]) : 3315
-    nm_arg     = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 92
+    vol_init    = length(ARGS) >= 5  ? (ARGS[5]  == "nothing" ? nothing : ARGS[5])  : nothing
+    pasta_ant   = length(ARGS) >= 6  ? (ARGS[6]  == "nothing" ? nothing : ARGS[6])  : nothing
+    overlap     = length(ARGS) >= 7  ? parse(Int, ARGS[7]) : 0
+    k_cand      = length(ARGS) >= 8  ? parse(Int, ARGS[8]) : 3
+    nb_arg      = length(ARGS) >= 9  ? parse(Int, ARGS[9]) : 3315
+    nm_arg      = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 92
+    fontes_path = length(ARGS) >= 11 ? (ARGS[11] == "nothing" ? nothing : ARGS[11]) : nothing
 
     rodar_rolling_horizon(p, nome_pasta, dia_inicio, num_dias,
         caminho_volumes_iniciais=vol_init,
@@ -353,5 +377,6 @@ if length(ARGS) >= 4
         overlap_dias=overlap,
         num_candidatos=k_cand,
         num_beneficiarios=nb_arg,
-        num_mananciais=nm_arg)
+        num_mananciais=nm_arg,
+        fontes_definidas_path=fontes_path)
 end
