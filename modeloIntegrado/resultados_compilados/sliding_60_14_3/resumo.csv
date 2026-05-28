@@ -1,0 +1,10 @@
+Metrica,Valor
+Janela (dias),60.0
+Sobreposicao (dias),14.0
+Passo (dias),46.0
+Total Entregas,53510.0
+Custo Total (heuristica),2269678.17
+Pico Diario (max entregas/dia),538.0
+Dia do Pico,100.0
+Custo Medio por Entrega,42.416
+Beneficiarios sem fonte valida (fallback),0.0
