@@ -11,10 +11,8 @@ MAPA_INTEGRADO = {
     "abastecimento_00_1250": CAMINHO_INTEGRADO,
 }
 
-# Lê aba principal sem colunas extras do integrado (caso já existam de rodada anterior)
-df_main_raw = pd.read_excel(CAMINHO_XLSX, sheet_name="Resultados_Custos")
-cols_base = [c for c in df_main_raw.columns if "Integrado" not in str(c)]
-df_main = df_main_raw[cols_base].copy()
+# Lê sempre do backup CSV (fonte limpa do tester, sem acúmulo de rodadas anteriores)
+df_main = pd.read_csv(PASTA_SAIDAS / "backup_temporario.csv", sep=";", decimal=",")
 
 # Lê custos de referência (M1 Diário) por instância
 ref_custo = dict(zip(df_main["Nome da Instância"], df_main["Custo M1 Diário"]))
