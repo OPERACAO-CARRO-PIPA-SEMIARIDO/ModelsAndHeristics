@@ -3,8 +3,7 @@ Janela (dias),120.0
 Sobreposicao (dias),14.0
 Passo (dias),106.0
 Total Entregas,48518.0
-Custo Total (heuristica),2078367.78
+Custo Total,1876373.29
 Pico Diario (max entregas/dia),581.0
 Dia do Pico,227.0
-Custo Medio por Entrega,42.837
-Beneficiarios sem fonte valida (fallback),0.0
+Custo Medio por Entrega,38.6738

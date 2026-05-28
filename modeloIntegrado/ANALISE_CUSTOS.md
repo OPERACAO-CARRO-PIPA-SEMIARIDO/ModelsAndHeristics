@@ -6,22 +6,26 @@ Os custos calculados pelo `gerar_controle` nos arquivos `controle_sliding.xlsx` 
 
 ---
 
-## Custos corretos (recomputados com heurística de alocação)
+## Custos corretos (recomputados — herança de fonte entre períodos)
 
-| Configuração       | Entregas | Custo **ERRADO** (controle_sliding.xlsx) | Custo **CORRETO** (heurística) |
-|--------------------|----------|------------------------------------------|-------------------------------|
-| sliding\_60\_14\_3  | 53.510   | 8.030.469                                | **2.269.678**                 |
-| sliding\_90\_14\_3  | 49.560   | 7.467.429                                | **2.122.377**                 |
-| sliding\_120\_14\_3 | 48.518   | 7.320.367                                | **2.078.368**                 |
+Lógica aplicada: **o manancial é definido no primeiro período com entrega; períodos seguintes herdam**. O calendário (abastecimento) não é alterado.
+
+| Configuração       | Entregas | Custo **ERRADO** (controle_sliding.xlsx) | Custo **CORRETO** |
+|--------------------|----------|------------------------------------------|-------------------|
+| sliding\_60\_14\_3  | 53.510   | 8.030.469                                | **2.107.999**     |
+| sliding\_90\_14\_3  | 49.560   | 7.467.429                                | **1.947.344**     |
+| sliding\_120\_14\_3 | 48.518   | 7.320.367                                | **1.876.373**     |
+
+Os arquivos de saída estão em `resultados_compilados/`.
 
 ## Referência: minimizaPicos + saidas\_3
 
-| Instância    | M1 Diário  | M2 (fonte única) |
-|--------------|------------|-----------------|
-| alocacao\_00  | 1.651.961  | 1.750.413       |
-| alocacao\_10wLim | 1.608.397 | 1.634.182    |
+| Instância        | M1 Diário  | M2 (fonte única) |
+|------------------|------------|-----------------|
+| alocacao\_00      | 1.651.961  | 1.750.413       |
+| alocacao\_10wLim  | 1.608.397  | 1.634.182       |
 
-Os custos corretos do sliding window (~2.1–2.3M) são maiores que saidas\_3 (~1.65–1.75M) porque o sliding window gera mais entregas totais, pressionando mais a capacidade dos mananciais.
+Os custos corretos do sliding window (1.88–2.11M) ficam próximos ao M2 (~1.65–1.75M), como esperado — janelas maiores geram menos entregas e custam menos.
 
 ---
 
