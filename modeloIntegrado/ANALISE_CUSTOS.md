@@ -8,15 +8,23 @@ Os custos calculados pelo `gerar_controle` nos arquivos `controle_sliding.xlsx` 
 
 ## Custos corretos (recomputados — herança de fonte entre períodos)
 
-Lógica aplicada: **o manancial é definido no primeiro período com entrega; períodos seguintes herdam**. O calendário (abastecimento) não é alterado.
+Lógica aplicada:
+- **Calendário**: dias de sobreposição (warm-start) usam os valores do período posterior (re-otimizado). `abastecimento_GLOBAL.csv` correto.
+- **Fonte**: manancial definido no primeiro período com entrega; períodos seguintes herdam. Fontes recomputadas via `alocacao_GLOBAL_corrigida.csv` (os arquivos brutos `alocacao_melhor_absoluto.csv` têm bug).
+- **Custo**: `Σ distância_w_factor[fonte, benef] × entregas` com matriz de distâncias em ordem C (fonte × benef).
 
-| Configuração       | Entregas | Custo **ERRADO** (controle_sliding.xlsx) | Custo **CORRETO** |
-|--------------------|----------|------------------------------------------|-------------------|
-| sliding\_60\_14\_3  | 53.510   | 8.030.469                                | **2.107.999**     |
-| sliding\_90\_14\_3  | 49.560   | 7.467.429                                | **1.947.344**     |
-| sliding\_120\_14\_3 | 48.518   | 7.320.367                                | **1.876.373**     |
+| Configuração        | Entregas | Custo **ERRADO** (controle_sliding.xlsx) | Custo **CORRETO** | Pico (dia) |
+|---------------------|----------|------------------------------------------|-------------------|------------|
+| sliding\_60\_14\_3  | 53.510   | 8.030.469                                | **2.107.999**     | 538 (d100) |
+| sliding\_90\_14\_3  | 49.560   | 7.467.429                                | **1.947.344**     | 592 (d317) |
+| sliding\_120\_14\_3 | 48.518   | 7.320.367                                | **1.876.373**     | 581 (d227) |
 
-Os arquivos de saída estão em `resultados_compilados/`.
+Os arquivos de saída estão em `resultados_compilados/`:
+- `abastecimento_GLOBAL.csv` — calendário de entregas (365 dias, sobreposição do período posterior)
+- `alocacao_GLOBAL_corrigida.csv` — alocação de fontes (herança, corrigida)
+- `custos_por_dia.csv` — custo e entregas por dia
+- `resumo.csv` — totais por configuração
+- `resumo_geral.xlsx` — comparativo das 3 configurações
 
 ## Referência: minimizaPicos + saidas\_3
 
@@ -59,3 +67,7 @@ Os custos corretos do sliding window (1.88–2.11M) ficam próximos ao M2 (~1.65
 
 1. **`salvar_saidas_sliding`** em `modeloSlidingArgs.jl`: verificar por que `val_z[j, i]` não retorna o valor correto e corrigir o loop de salvamento da fonte
 2. **Após corrigir**: rerodar `gerar_controle` (ou recalcular custos via heurística) para atualizar os `controle_sliding.xlsx`
+
+## Nota sobre cálculo correto dos custos
+
+O `custos_por_dia.csv` e `resumo_geral.xlsx` em `resultados_compilados/` foram recomputados usando `abastecimento_GLOBAL.csv` + `alocacao_GLOBAL_corrigida.csv` com matriz de distâncias em ordem C (reshape NM×NB, fonte-major). A abordagem "Obj do solver proporcional ao passo" não é correta pois não desconta o custo real dos dias de sobreposição.
