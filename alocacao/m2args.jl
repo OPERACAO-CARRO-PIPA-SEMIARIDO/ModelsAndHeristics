@@ -29,10 +29,10 @@ NUM_DIAS = size(abastecimento, 2) - 1
 NUM_MANANCIAIS_TOTAL = 92 # Total no arquivo de rotas
 NUM_MANANCIAIS = NUM_MANANCIAIS_TESTE # Limitado para o teste
 NUM_BENEFICIARIOS = size(abastecimento, 1)
-NB_TOTAL_ROTAS = 3315
 CAPACIDADE_MAX_MANANCIAL = 12
 
 distancias = rotas.distance_w_factor
+NB_TOTAL_ROTAS = length(distancias) ÷ NUM_MANANCIAIS_TOTAL
 Dij_completa = transpose(reshape(distancias, (NB_TOTAL_ROTAS, NUM_MANANCIAIS_TOTAL)))
 Dij = Dij_completa[1:NUM_MANANCIAIS, 1:NUM_BENEFICIARIOS]
 Ajk = Matrix{Float64}(abastecimento[:, 2:end])

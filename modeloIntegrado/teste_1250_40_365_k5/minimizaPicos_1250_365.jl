@@ -30,7 +30,7 @@ quebra3 = [j for (j, x) in zip(nb, Y) if x < 4]
 quebra2 = [j for (j, x) in zip(nb, Y) if x < 3]
 
 # p=1.0 → minimiza pico; p=0.0 → minimiza total de entregas
-const P_VALOR = 1.0
+const P_VALOR = 0.10
 
 function rodar_minpicos(p_valor, nome_pasta; arquivo_warm_start=nothing)
     caminho_pasta = isabspath(nome_pasta) ? nome_pasta : joinpath(@__DIR__, nome_pasta)
@@ -177,5 +177,5 @@ function salvar_minpicos(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "volumes_$sufixo.csv"),       DataFrame(colunas_v, nomes))
 end
 
-ws_path = joinpath(@__DIR__, "abastecimento_heu_full.csv")
+ws_path = joinpath(@__DIR__, "abastecimento_limite_1250.csv")
 rodar_minpicos(P_VALOR, "resultados_minpicos"; arquivo_warm_start=ws_path)
