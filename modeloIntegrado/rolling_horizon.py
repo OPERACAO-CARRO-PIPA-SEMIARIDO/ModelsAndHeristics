@@ -8,17 +8,67 @@ from pathlib import Path
 # CONFIGURAÇÃO — edite aqui para mudar o teste
 # ==========================================
 PASTA_BASE   = Path("C:/Users/lfeli/Documents/AlocacaoCarros/ModelsAndHeristics/modeloIntegrado")
-PASTA_SAIDAS = PASTA_BASE
+PASTA_SAIDAS = PASTA_BASE / "testes_rolling"
 JULIA_SCRIPT = PASTA_BASE / "modeloRollingArgs.jl"
 ROTAS_FILE   = PASTA_BASE.parent / "alocacao" / "Dados" / "rotas"
 TOTAL_DIAS   = 365
 PESO_PICO    = 0.0
 K_CANDIDATOS = 3
 
-# Rolling horizon — janela 90 dias, sobreposição 14 dias, passo 76 dias
+# Rolling horizon — executados em ordem: 120 → 90 → 60 dias
+# sobreposicao=14 para todos; passo = janela - sobreposicao
 ROLLING_CONFIGS = [
-    {"janela": 90, "sobreposicao": 14, "nb": 3315, "nm": 92},
+    {"janela": 120, "sobreposicao": 14, "nb": 3315, "nm": 92},
+    {"janela": 90,  "sobreposicao": 14, "nb": 3315, "nm": 92},
+    {"janela": 60,  "sobreposicao": 14, "nb": 3315, "nm": 92},
 ]
+
+
+# ==========================================
+# GERENCIAMENTO DE MANANCIAIS ATRIBUÍDOS
+# ==========================================
+
+def inicializar_mananciais_csv(nb, pasta_saida):
+    """Cria CSV com todos os beneficiários marcados como -1 (sem manancial atribuído)."""
+    path = pasta_saida / "mananciais_atribuidos.csv"
+    df = pd.DataFrame({
+        "Beneficiario": range(1, nb + 1),
+        "Fonte": [-1] * nb,
+    })
+    df.to_csv(path, index=False)
+    print(f"    CSV de mananciais inicializado: {nb} beneficiários com Fonte=-1")
+    return path
+
+
+def atualizar_mananciais_csv(pasta_periodo, mananciais_path):
+    """Lê resultado do período e preenche -1 com a primeira fonte usada por cada beneficiário."""
+    aloc_file  = pasta_periodo / "alocacao_resultado.csv"
+    abast_file = pasta_periodo / "abastecimento_resultado.csv"
+    if not aloc_file.exists() or not abast_file.exists():
+        return
+
+    df_man   = pd.read_csv(mananciais_path)
+    df_aloc  = pd.read_csv(aloc_file)
+    df_abast = pd.read_csv(abast_file)
+    dias_cols = [c for c in df_aloc.columns if c != "Beneficiarios"]
+
+    benef_to_idx = {int(df_man.loc[i, "Beneficiario"]): i for i in range(len(df_man))}
+    novos = 0
+
+    for idx in range(len(df_aloc)):
+        benef_id = int(df_aloc.loc[idx, "Beneficiarios"])
+        man_idx  = benef_to_idx.get(benef_id)
+        if man_idx is None or df_man.loc[man_idx, "Fonte"] != -1:
+            continue
+        for dia in dias_cols:
+            if df_abast.loc[idx, dia] > 0 and df_aloc.loc[idx, dia] > 0:
+                df_man.loc[man_idx, "Fonte"] = int(df_aloc.loc[idx, dia])
+                novos += 1
+                break
+
+    df_man.to_csv(mananciais_path, index=False)
+    total_atrib = (df_man["Fonte"] != -1).sum()
+    print(f"    Mananciais atualizados: +{novos} novos → {total_atrib}/{len(df_man)} total")
 
 
 # ==========================================
@@ -26,9 +76,14 @@ ROLLING_CONFIGS = [
 # ==========================================
 
 def consolidar_resultados(output_dir, num_periodos):
+    """
+    Consolida CSVs de todos os períodos em arquivos GLOBAL.
+    Períodos são processados em ordem: os primeiros 14 dias do período N+1
+    sobrescrevem os dias sobrepostos do período N.
+    """
     print(f"\n>>> Consolidando resultados em {output_dir}...")
     df_abast_global = None
-    df_aloc_global = None
+    df_aloc_global  = None
 
     for p in range(1, num_periodos + 2):
         pastas = list(output_dir.glob(f"periodo_{p}_dia_*"))
@@ -68,14 +123,13 @@ def consolidar_resultados(output_dir, num_periodos):
         print(f"    Arquivos GLOBAL salvos.")
 
 
-def gerar_controle(output_dir, k_candidatos=K_CANDIDATOS, nm_usado=92):
+def gerar_controle(output_dir, k_candidatos=K_CANDIDATOS, nm_usado=92, nb_total=3315):
     print(f"\n>>> Gerando planilha de controle em {output_dir}...")
     try:
         df_rotas   = pd.read_csv(ROTAS_FILE)
         NM_ARQ     = 92
-        NB_ARQ     = len(df_rotas) // NM_ARQ
-        distancias = df_rotas['distance_w_factor'].values.reshape(NM_ARQ, NB_ARQ)
-        distancias = distancias[:nm_usado, :]  # só os mananciais usados no teste
+        distancias = df_rotas['distance_w_factor'].values.reshape(NM_ARQ, nb_total)
+        distancias = distancias[:nm_usado, :]
 
         df_abast = pd.read_csv(output_dir / "abastecimento_GLOBAL.csv")
         df_aloc  = pd.read_csv(output_dir / "alocacao_GLOBAL.csv")
@@ -89,8 +143,8 @@ def gerar_controle(output_dir, k_candidatos=K_CANDIDATOS, nm_usado=92):
         rank_counts    = {i: 0 for i in range(1, k_candidatos + 1)}
 
         for idx, b_id in enumerate(beneficiarios):
-            b_idx   = int(b_id) - 1
-            dists_b = distancias[:, b_idx]
+            b_idx    = int(b_id) - 1
+            dists_b  = distancias[:, b_idx]
             rank_map = {m: r + 1 for r, m in enumerate(np.argsort(dists_b) + 1)}
             for dia in dias_cols:
                 qtd   = df_abast.loc[idx, dia]
@@ -115,44 +169,18 @@ def gerar_controle(output_dir, k_candidatos=K_CANDIDATOS, nm_usado=92):
         print(f"    Erro ao gerar controle: {e}")
 
 
-def atualizar_fontes_definidas(pasta_periodo, fontes_dict):
-    """Lê alocacao_resultado.csv do período e registra, para cada beneficiário
-    ainda sem fonte atribuída, a primeira fonte encontrada no período."""
-    aloc_file  = pasta_periodo / "alocacao_resultado.csv"
-    abast_file = pasta_periodo / "abastecimento_resultado.csv"
-    if not aloc_file.exists() or not abast_file.exists():
-        return fontes_dict
-
-    df_aloc  = pd.read_csv(aloc_file)
-    df_abast = pd.read_csv(abast_file)
-    dias_cols = [c for c in df_aloc.columns if c != "Beneficiarios"]
-
-    for idx in range(len(df_aloc)):
-        benef_id = int(df_aloc.loc[idx, "Beneficiarios"])
-        if benef_id in fontes_dict:
-            continue
-        for dia in dias_cols:
-            if df_abast.loc[idx, dia] > 0 and df_aloc.loc[idx, dia] > 0:
-                fontes_dict[benef_id] = int(df_aloc.loc[idx, dia])
-                break
-
-    return fontes_dict
-
-
 # ==========================================
-# EXECUTOR DE JANELA (SLIDING WINDOW CORE)
+# EXECUTOR DE JANELA (ROLLING HORIZON CORE)
 # ==========================================
 
 def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
-    """Executa o rolling horizon (sliding window) com os parâmetros dados."""
     pasta_saida = Path(pasta_saida)
     pasta_saida.mkdir(parents=True, exist_ok=True)
 
     passo                 = janela - sobreposicao
+    mananciais_path       = inicializar_mananciais_csv(nb, pasta_saida)
     volumes_iniciais_path = "nothing"
     pasta_anterior        = "nothing"
-    fontes_definidas_path = "nothing"
-    fontes_dict           = {}
     dia_inicio            = 1
     periodo_count         = 1
 
@@ -161,9 +189,11 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
         pasta_periodo = pasta_saida / f"periodo_{periodo_count}_dia_{dia_inicio}"
         pasta_periodo.mkdir(exist_ok=True)
 
+        df_man       = pd.read_csv(mananciais_path)
+        n_atribuidos = (df_man["Fonte"] != -1).sum()
         print(f"\n  Período {periodo_count}: dias {dia_inicio} a {dia_inicio + num_dias - 1}")
-        if fontes_dict:
-            print(f"    Fontes já definidas: {len(fontes_dict)}/{nb} beneficiários")
+        if n_atribuidos > 0:
+            print(f"    Fontes já definidas: {n_atribuidos}/{nb} beneficiários")
 
         cmd = [
             "julia", str(JULIA_SCRIPT),
@@ -177,7 +207,7 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
             str(K_CANDIDATOS),
             str(nb),
             str(nm),
-            str(fontes_definidas_path),
+            str(mananciais_path),
         ]
 
         try:
@@ -186,14 +216,8 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
             print(f"    ERRO ao executar Julia: {e}")
             break
 
-        # Registra fontes definidas neste período e persiste para o próximo
-        fontes_dict = atualizar_fontes_definidas(pasta_periodo, fontes_dict)
-        if fontes_dict:
-            df_fontes = pd.DataFrame([
-                {"Beneficiario": j, "Fonte": f} for j, f in fontes_dict.items()
-            ])
-            fontes_definidas_path = pasta_saida / "fontes_definidas.csv"
-            df_fontes.to_csv(fontes_definidas_path, index=False)
+        # Registra fontes atribuídas neste período no CSV compartilhado
+        atualizar_mananciais_csv(pasta_periodo, mananciais_path)
 
         volumes_todos = pasta_periodo / "volumes_todos_dias.csv"
         if not volumes_todos.exists():
@@ -224,7 +248,7 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
         periodo_count += 1
 
     consolidar_resultados(pasta_saida, periodo_count)
-    gerar_controle(pasta_saida, K_CANDIDATOS, nm_usado=nm)
+    gerar_controle(pasta_saida, K_CANDIDATOS, nm_usado=nm, nb_total=nb)
 
 
 # ==========================================
@@ -232,10 +256,9 @@ def executar_janela(janela, sobreposicao, nb, nm, pasta_saida):
 # ==========================================
 
 def main():
-    # --- Rolling horizon ---
     for cfg in ROLLING_CONFIGS:
-        j = cfg["janela"]
-        s = cfg["sobreposicao"]
+        j  = cfg["janela"]
+        s  = cfg["sobreposicao"]
         nb = cfg["nb"]
         nm = cfg["nm"]
         passo = j - s
