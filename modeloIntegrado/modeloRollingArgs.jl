@@ -212,14 +212,18 @@ function rodar_rolling_horizon(
     end
 
     # --- Fixa fontes já definidas em períodos anteriores ---
-    # Beneficiários com fonte definida têm z fixado — o solver não pode alterar a escolha.
+    # CSV contém todos os beneficiários: Fonte=-1 significa livre para escolher,
+    # Fonte>0 significa manancial fixado (o solver não pode alterar a escolha).
     if !isnothing(fontes_definidas_path) && isfile(fontes_definidas_path)
-        println(">>> Fixando fontes definidas de: $fontes_definidas_path")
+        println(">>> Carregando mananciais atribuídos de: $fontes_definidas_path")
         df_fontes = CSV.read(fontes_definidas_path, DataFrame)
         n_fixados = 0
         for row in eachrow(df_fontes)
             j     = Int(row.Beneficiario)
             fonte = Int(row.Fonte)
+            if fonte == -1
+                continue  # ainda não atribuído — modelo livre para escolher
+            end
             if j in nb && fonte in candidatos_por_beneficiario[j]
                 fix(z[j, fonte], 1.0; force=true)
                 for i in candidatos_por_beneficiario[j]
@@ -233,9 +237,9 @@ function rodar_rolling_horizon(
         println("    $n_fixados beneficiários com fonte fixada.")
     end
 
-    # --- Otimização (limite de 2 horas, checkpoints a cada 15min/1h/2h) ---
+    # --- Otimização (limite de 5 horas, checkpoints a cada 1h/3h/5h) ---
     # Checkpoints curtos garantem que o primeiro resultado viável seja salvo logo que encontrado.
-    horas_checkpoints = [0.25, 1.0, 2.0]
+    horas_checkpoints = [1.0, 3.0, 5.0]
     melhor_obj_encontrado = Inf
     tempo_inicio_global = time()
 
