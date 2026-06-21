@@ -13,7 +13,33 @@ const NUM_MANANCIAIS = 15
 const NUM_MANANCIAIS_TOTAL = 92
 const CAPACIDADE_MAX_MANANCIAL = 12
 
-abastecimento = CSV.read(ABASTECIMENTO_FILE, DataFrame)
+function localizar_abastecimento_minpicos()
+    candidatos = [
+        ABASTECIMENTO_FILE,
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_24h.csv"),
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_21h.csv"),
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_18h.csv"),
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_15h.csv"),
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_12h.csv"),
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_9h.csv"),
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_6h.csv"),
+        joinpath(@__DIR__, "resultados_minpicos_p00", "abastecimento_3h.csv"),
+    ]
+
+    for caminho in candidatos
+        if isfile(caminho)
+            return caminho
+        end
+    end
+
+    error("Nenhum arquivo de abastecimento do minimizaPicos foi encontrado em resultados_minpicos_p00.")
+end
+
+const ABASTECIMENTO_ESCOLHIDO = localizar_abastecimento_minpicos()
+
+println("Usando abastecimento do minimizaPicos: $ABASTECIMENTO_ESCOLHIDO")
+
+abastecimento = CSV.read(ABASTECIMENTO_ESCOLHIDO, DataFrame)
 rotas = CSV.read(ROTAS_FILE, DataFrame)
 
 NUM_DIAS = size(abastecimento, 2) - 1

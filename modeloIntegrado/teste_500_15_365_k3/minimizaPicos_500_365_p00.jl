@@ -7,6 +7,7 @@ const MOI = MathOptInterface
 
 const BASE_PATH = "C:/Users/lfeli/Documents/AlocacaoCarros/dados/"
 const TEST_DIR = @__DIR__
+const LIMITE_PICO_M2 = 15 * 12
 
 beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
 dias_uteis           = CSV.read(BASE_PATH * "datas.csv", DataFrame)
@@ -63,6 +64,7 @@ function rodar_minpicos(p_valor, nome_pasta; arquivo_warm_start=nothing)
         V[j, k] == 0)
     @constraint(model, diasInuteis[j in nb, k in nd; Int(dias_uteis[k, 1]) == 0], x[j, k] == 0)
     @constraint(model, maiorPico[k in nd], sum(x[j, k] for j in nb) <= y)
+    @constraint(model, picoCompativelM2[k in nd], sum(x[j, k] for j in nb) <= LIMITE_PICO_M2)
     @constraint(model, volumeMinimo[j in nb, k in nd], V[j, k] >= 0)
     @constraint(model, capacidadeMax[j in nb, k in nd], V[j, k] <= C[j])
     @constraint(model, carnavalAbastecimento[j in quebra4, k in nd; calendarioCarnaval[k] == 1], x[j, k] >= 1)
@@ -202,4 +204,5 @@ warm_start_full = joinpath(TEST_DIR, "abastecimento_heu_full.csv")
 warm_start_escolhido = isfile(warm_start_limite) ? warm_start_limite : warm_start_full
 
 println("Warm start do minimizaPicos: $warm_start_escolhido")
+println("Pico diario maximo imposto para compatibilidade com M2: $LIMITE_PICO_M2")
 rodar_minpicos(P_VALOR, "resultados_minpicos_p00"; arquivo_warm_start=warm_start_escolhido)

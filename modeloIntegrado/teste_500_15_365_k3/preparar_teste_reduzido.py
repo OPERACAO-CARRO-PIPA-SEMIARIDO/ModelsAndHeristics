@@ -26,6 +26,26 @@ SCRIPT_M2 = TEST_DIR / "m2_minpicos_500_15.jl"
 SCRIPT_MODELO_INTEGRADO = TEST_DIR / "modeloIntegrado_ws_500_15_72h.jl"
 
 
+def localizar_abastecimento_minpicos() -> Path:
+    candidatos = [
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_melhor_absoluto.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_24h.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_21h.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_18h.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_15h.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_12h.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_9h.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_6h.csv",
+        TEST_DIR / "resultados_minpicos_p00" / "abastecimento_3h.csv",
+    ]
+
+    for caminho in candidatos:
+        if caminho.exists():
+            return caminho
+
+    raise FileNotFoundError("Nenhum arquivo de abastecimento do minimizaPicos foi encontrado.")
+
+
 def run_command(cmd, cwd=TEST_DIR):
     print(f"\n>>> Executando: {' '.join(str(part) for part in cmd)}")
     subprocess.run(cmd, cwd=str(cwd), check=True, shell=(os.name == "nt"))
@@ -115,6 +135,9 @@ def main():
 
     print("=== Etapa 3: minimizaPicos p=0.00 ===")
     run_command(["julia", str(SCRIPT_MINPICOS)])
+
+    abastecimento_minpicos = localizar_abastecimento_minpicos()
+    print(f"Arquivo escolhido para a etapa 4: {abastecimento_minpicos}")
 
     print("=== Etapa 4: m2 sobre o melhor calendario do minimizaPicos ===")
     run_command(["julia", str(SCRIPT_M2)])

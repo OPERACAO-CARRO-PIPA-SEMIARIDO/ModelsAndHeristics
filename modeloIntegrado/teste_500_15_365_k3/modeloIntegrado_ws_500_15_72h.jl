@@ -311,12 +311,34 @@ function salvar_saidas(model, pasta, sufixo)
     CSV.write(joinpath(pasta, "alocacao_$sufixo.csv"), df_alocacao)
 end
 
-ws_abast_opt = joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_melhor_absoluto.csv")
+function localizar_abastecimento_minpicos()
+    candidatos = [
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_melhor_absoluto.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_24h.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_21h.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_18h.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_15h.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_12h.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_9h.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_6h.csv"),
+        joinpath(TEST_DIR, "resultados_minpicos_p00", "abastecimento_3h.csv"),
+    ]
+
+    for caminho in candidatos
+        if isfile(caminho)
+            return caminho
+        end
+    end
+
+    return nothing
+end
+
+ws_abast_opt = localizar_abastecimento_minpicos()
 ws_aloc_opt = joinpath(TEST_DIR, "alocacao_m2_minpicos_p00.csv")
 ws_abast_heu = joinpath(TEST_DIR, "abastecimento_heu_limite.csv")
 ws_aloc_heu = joinpath(TEST_DIR, "alocacao_heu_limite.csv")
 
-ws_abast = isfile(ws_abast_opt) ? ws_abast_opt : ws_abast_heu
+ws_abast = !isnothing(ws_abast_opt) ? ws_abast_opt : ws_abast_heu
 ws_aloc = isfile(ws_aloc_opt) ? ws_aloc_opt : ws_aloc_heu
 
 println("Warm start abastecimento: $ws_abast")
