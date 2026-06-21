@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -48,7 +49,7 @@ def localizar_abastecimento_minpicos() -> Path:
 
 def run_command(cmd, cwd=TEST_DIR):
     print(f"\n>>> Executando: {' '.join(str(part) for part in cmd)}")
-    subprocess.run(cmd, cwd=str(cwd), check=True, shell=(os.name == "nt"))
+    subprocess.run(cmd, cwd=str(cwd), check=True, shell=False)
 
 
 def gerar_calendario_heuristico(modo: str) -> Path:
@@ -112,7 +113,7 @@ def rodar_heuristica_alocacao(caminho_abastecimento: Path, sufixo: str) -> None:
     output_custos = TEST_DIR / f"custos_heu_{sufixo}.csv"
 
     run_command([
-        "python",
+        sys.executable,
         str(HEURISTICA_ALOCACAO),
         str(caminho_abastecimento),
         str(output_aloc),
