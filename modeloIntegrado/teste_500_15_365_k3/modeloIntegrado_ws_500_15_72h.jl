@@ -64,9 +64,11 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
     model = Model(Gurobi.Optimizer)
     set_optimizer_attribute(model, "OutputFlag", 1)
     set_optimizer_attribute(model, "LogToConsole", 1)
-    set_optimizer_attribute(model, "NodefileStart", 10.0)
-    set_optimizer_attribute(model, "MemLimit", 28.0)
-    set_optimizer_attribute(model, "Threads", 4)
+    set_optimizer_attribute(model, "LogFile", joinpath(caminho_pasta, "gurobi.log"))
+    set_optimizer_attribute(model, "NodefileDir", caminho_pasta)
+    set_optimizer_attribute(model, "NodefileStart", 1.0)
+    set_optimizer_attribute(model, "MemLimit", 18.0)
+    set_optimizer_attribute(model, "Threads", 2)
     set_optimizer_attribute(model, "MIPFocus", 1)
 
     @variable(model, 0 <= x[j in nb, i in candidatos_por_beneficiario[j], k in nd], Int)
@@ -233,6 +235,11 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
                 return
             else
                 println("\nErro Fatal: $e")
+                if has_values(model)
+                    println(">>> Salvando melhor incumbente disponivel apos erro na hora $hora.")
+                    salvar_saidas(model, caminho_pasta, "$(hora)h_ERRO")
+                    salvar_saidas(model, caminho_pasta, "melhor_absoluto")
+                end
                 break
             end
         end
