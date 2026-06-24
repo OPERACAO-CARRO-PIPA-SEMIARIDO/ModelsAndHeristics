@@ -345,12 +345,17 @@ ws_aloc_opt = joinpath(TEST_DIR, "alocacao_m2_minpicos_p00.csv")
 ws_abast_heu = joinpath(TEST_DIR, "abastecimento_heu_limite.csv")
 ws_aloc_heu = joinpath(TEST_DIR, "alocacao_heu_limite.csv")
 
-ws_abast = !isnothing(ws_abast_opt) ? ws_abast_opt : ws_abast_heu
-ws_aloc = isfile(ws_aloc_opt) ? ws_aloc_opt : ws_aloc_heu
+output_dir = length(ARGS) >= 1 ? ARGS[1] : "resultados_500_15_365_72h"
+ws_abast_arg = length(ARGS) >= 2 ? ARGS[2] : nothing
+ws_aloc_arg = length(ARGS) >= 3 ? ARGS[3] : nothing
 
+ws_abast = !isnothing(ws_abast_arg) ? ws_abast_arg : (!isnothing(ws_abast_opt) ? ws_abast_opt : ws_abast_heu)
+ws_aloc = !isnothing(ws_aloc_arg) ? ws_aloc_arg : (isfile(ws_aloc_opt) ? ws_aloc_opt : ws_aloc_heu)
+
+println("Pasta de saida:          $output_dir")
 println("Warm start abastecimento: $ws_abast")
 println("Warm start alocacao:      $ws_aloc")
 
-rodar_modelo_integrado(0.00, "resultados_500_15_365_72h";
+rodar_modelo_integrado(0.00, output_dir;
     abastecimento_warm_start=ws_abast,
     alocacao_warm_start=ws_aloc)
