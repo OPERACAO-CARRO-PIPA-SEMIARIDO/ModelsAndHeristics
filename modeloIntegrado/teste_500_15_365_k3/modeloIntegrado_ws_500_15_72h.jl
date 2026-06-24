@@ -55,7 +55,8 @@ end
 
 function rodar_modelo_integrado(p::Float64, nome_pasta::String;
                                 abastecimento_warm_start=nothing,
-                                alocacao_warm_start=nothing)
+                                alocacao_warm_start=nothing,
+                                max_horas::Int=72)
     caminho_pasta = isabspath(nome_pasta) ? nome_pasta : joinpath(TEST_DIR, nome_pasta)
     if !isdir(caminho_pasta)
         mkpath(caminho_pasta)
@@ -199,7 +200,7 @@ function rodar_modelo_integrado(p::Float64, nome_pasta::String;
 
     println(">>> Warm start: heuristica/minpicos aplicada em $n_heu_usados beneficiarios.")
 
-    horas_checkpoints = 3:3:72
+    horas_checkpoints = 3:3:max_horas
     segundos_checkpoints = Float64.(horas_checkpoints .* 3600)
 
     df_historico = DataFrame(
@@ -348,6 +349,7 @@ ws_aloc_heu = joinpath(TEST_DIR, "alocacao_heu_limite.csv")
 output_dir = length(ARGS) >= 1 ? ARGS[1] : "resultados_500_15_365_72h"
 ws_abast_arg = length(ARGS) >= 2 ? ARGS[2] : nothing
 ws_aloc_arg = length(ARGS) >= 3 ? ARGS[3] : nothing
+max_horas_arg = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : 72
 
 ws_abast = !isnothing(ws_abast_arg) ? ws_abast_arg : (!isnothing(ws_abast_opt) ? ws_abast_opt : ws_abast_heu)
 ws_aloc = !isnothing(ws_aloc_arg) ? ws_aloc_arg : (isfile(ws_aloc_opt) ? ws_aloc_opt : ws_aloc_heu)
@@ -355,7 +357,9 @@ ws_aloc = !isnothing(ws_aloc_arg) ? ws_aloc_arg : (isfile(ws_aloc_opt) ? ws_aloc
 println("Pasta de saida:          $output_dir")
 println("Warm start abastecimento: $ws_abast")
 println("Warm start alocacao:      $ws_aloc")
+println("Limite de horas:          $max_horas_arg")
 
 rodar_modelo_integrado(0.00, output_dir;
     abastecimento_warm_start=ws_abast,
-    alocacao_warm_start=ws_aloc)
+    alocacao_warm_start=ws_aloc,
+    max_horas=max_horas_arg)

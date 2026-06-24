@@ -9,6 +9,7 @@ SCRIPT_MODELO_INTEGRADO = TEST_DIR / "modeloIntegrado_ws_500_15_72h.jl"
 WS_ABAST = TEST_DIR / "resultados_minpicos_p00" / "abastecimento_melhor_absoluto.csv"
 WS_ALOC = TEST_DIR / "alocacao_m2_minpicos_p00.csv"
 OUTPUT_DIR = "resultados_500_15_365_72h_ws_minpicos_m2"
+MAX_HORAS = "24"
 
 
 def main():
@@ -23,6 +24,7 @@ def main():
         OUTPUT_DIR,
         str(WS_ABAST),
         str(WS_ALOC),
+        MAX_HORAS,
     ]
 
     print(f"Executando: {' '.join(cmd)}")
