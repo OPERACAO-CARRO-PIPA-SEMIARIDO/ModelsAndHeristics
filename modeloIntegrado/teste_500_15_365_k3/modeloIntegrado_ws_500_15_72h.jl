@@ -14,7 +14,7 @@ const CAPACIDADE_MAX_MANANCIAL = 12
 const TOTAL_BENEFICIARIOS = 500
 const TOTAL_MANANCIAIS = 15
 const TOTAL_DIAS = 365
-const NUM_CANDIDATOS = 3
+const NUM_CANDIDATOS = length(ARGS) >= 5 ? parse(Int, ARGS[5]) : 3
 
 beneficiarios_ativos = CSV.read(BASE_PATH * "Beneficiarios_RN_Ativos1.csv", DataFrame)
 dias_uteis = CSV.read(BASE_PATH * "datas.csv", DataFrame)
@@ -350,6 +350,7 @@ output_dir = length(ARGS) >= 1 ? ARGS[1] : "resultados_500_15_365_72h"
 ws_abast_arg = length(ARGS) >= 2 ? ARGS[2] : nothing
 ws_aloc_arg = length(ARGS) >= 3 ? ARGS[3] : nothing
 max_horas_arg = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : 72
+num_candidatos_arg = NUM_CANDIDATOS
 
 ws_abast = !isnothing(ws_abast_arg) ? ws_abast_arg : (!isnothing(ws_abast_opt) ? ws_abast_opt : ws_abast_heu)
 ws_aloc = !isnothing(ws_aloc_arg) ? ws_aloc_arg : (isfile(ws_aloc_opt) ? ws_aloc_opt : ws_aloc_heu)
@@ -358,6 +359,7 @@ println("Pasta de saida:          $output_dir")
 println("Warm start abastecimento: $ws_abast")
 println("Warm start alocacao:      $ws_aloc")
 println("Limite de horas:          $max_horas_arg")
+println("Num candidatos:          $num_candidatos_arg")
 
 rodar_modelo_integrado(0.00, output_dir;
     abastecimento_warm_start=ws_abast,
